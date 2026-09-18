@@ -2,3 +2,12 @@
 Backend/02_Datasets/
 Backend/03_References/
 Backend/04_Example_Submission/
+
+# Python environments and generated SHM artifacts
+.venv/
+__pycache__/
+.pytest_cache/
+pytest-cache-files-*/
+Backend/SHM/.cache/
+Backend/SHM/outputs/
+Backend/SHM/shm_predictions.csv
