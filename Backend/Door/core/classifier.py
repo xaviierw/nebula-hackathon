@@ -40,7 +40,7 @@ class DoorClassifier:
         return cls(json.loads(Path(path).read_text()))
 
     DETAIL_COLUMNS = [
-        "start_time", "end_time", "operation",
+        "start_time", "end_time", "start_row", "end_row", "operation",
         "steady_current_mA", "threshold_mA", "prediction", "margin_ratio",
     ]
 
@@ -60,6 +60,9 @@ class DoorClassifier:
         return {
             "start_time": row["start_time"],
             "end_time": row["end_time"],
+            # Carried through so a caller can slice the source frame directly.
+            "start_row": int(row["start_row"]),
+            "end_row": int(row["end_row"]),
             "operation": "Open" if is_open else "Close",
             "steady_current_mA": round(value, 1),
             "threshold_mA": round(cut, 1),

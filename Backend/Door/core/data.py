@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from core.scoring import Segment, parse_time
@@ -23,10 +24,18 @@ POSITION = "Door leaf position"
 OPEN_CMD = "Open command"
 CLOSE_CMD = "Close command"
 
-# Intra-cycle sampling period is 20 ms; inter-cycle gaps are 20-55 s. Any
-# threshold in that enormous range yields identical segmentation, so this is a
-# structural constant rather than a tuned hyperparameter.
+# Fallback gap threshold, used only when a stream is too uniform for one to be
+# derived (see derive_gap_seconds). Intra-cycle sampling is 20 ms and
+# inter-cycle gaps are 10-59 s, so any threshold in that enormous range yields
+# identical segmentation -- this is a structural constant, not a tuned
+# hyperparameter. The derived threshold is preferred because it reads the
+# separation out of the file in hand rather than assuming this one holds.
 GAP_SECONDS = 0.1
+
+# A derived threshold is only trusted when the two populations are separated by
+# at least this ratio. Below it, the largest jump is more likely a dropped
+# sample than a cycle boundary, so the constant above is used instead.
+MIN_SEPARATION_RATIO = 10.0
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "02_Datasets" / "Door"
 
@@ -77,11 +86,50 @@ def load_truth_frame(path: str | Path) -> pd.DataFrame:
     return frame
 
 
-def find_cycles(frame: pd.DataFrame, gap_seconds: float = GAP_SECONDS) -> list[tuple[int, int]]:
+def derive_gap_seconds(frame: pd.DataFrame) -> float:
+    """Derive the cycle-boundary threshold from the stream's own timing.
+
+    Sampling intervals in these streams fall into two populations with nothing
+    between them: 20 ms within a cycle, tens of seconds between cycles. So the
+    threshold is read off the data -- find the largest *ratio* jump in the
+    sorted distinct intervals and sit at its geometric midpoint.
+
+    Ratio rather than absolute difference, because the two populations differ by
+    orders of magnitude; and geometric rather than arithmetic midpoint, so the
+    threshold sits centrally on a log scale rather than hugging the smaller
+    population.
+
+    Falls back to GAP_SECONDS when the stream is too uniform to split (a single
+    cycle, or fewer than two distinct intervals) or when the largest jump is
+    smaller than MIN_SEPARATION_RATIO, which would make it a dropped sample
+    rather than a cycle boundary.
+
+    On both supplied streams this reproduces the hardcoded constant's
+    segmentation exactly: Train 0.4520 s, Test 0.4714 s, 110 and 38 cycles.
+    """
+    deltas = frame[TIME].diff().dt.total_seconds().dropna().unique()
+    deltas = np.sort(deltas[deltas > 0])
+    if len(deltas) < 2:
+        return GAP_SECONDS
+    ratios = deltas[1:] / deltas[:-1]
+    i = int(ratios.argmax())
+    if ratios[i] < MIN_SEPARATION_RATIO:
+        return GAP_SECONDS
+    return float(np.sqrt(deltas[i] * deltas[i + 1]))
+
+
+def find_cycles(
+    frame: pd.DataFrame, gap_seconds: float | None = None
+) -> list[tuple[int, int]]:
     """Split the stream into cycles at breaks in sampling continuity.
+
+    ``gap_seconds`` defaults to a threshold derived from this stream
+    (derive_gap_seconds); pass a number to override it.
 
     Returns inclusive ``(start_row, end_row)`` index pairs into ``frame``.
     """
+    if gap_seconds is None:
+        gap_seconds = derive_gap_seconds(frame)
     times = frame[TIME].tolist()
     if not times:
         return []

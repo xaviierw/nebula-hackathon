@@ -9,6 +9,26 @@ resistance, so the most informative window is the *mid-travel* portion.
 That window is located by door-leaf travel fraction rather than by a fixed row
 percentage, so cycles that run long or travel further than usual still have
 their steady-state phase measured, not a misaligned slice of it.
+
+Caveat, stated rather than defended
+-----------------------------------
+MID_TRAVEL_START/END (0.20/0.85) and the choice of `current_mid_mean` as the
+model's single decision feature were fixed by hand after inspecting the whole
+training set, not selected inside a cross-validation loop. That is a form of
+researcher-degrees-of-freedom leakage: no fold instrumentation can detect it,
+because the choice was made before any fold existed.
+
+It is very unlikely to matter here -- the two classes are separated by 19-54
+standard deviations of the Normal cluster (measured over all 110 Train cycles),
+so almost any window over the mid-travel region gives the same answer -- but the
+honest CV estimate would re-select the window within each fold. Anyone reading
+the reported scores should know the window was not chosen blind.
+
+Separately, travel_fraction itself was written after inspecting the *unlabelled*
+Test inputs: the 807-travel Open in its docstring below exists only in Test.csv.
+No labels were available for those inputs, so no label information could have
+leaked, and fraction-based normalisation is the correct design either way. Full
+disclosure in audit/dataset_limitations.md, section 4.
 """
 
 from __future__ import annotations
@@ -113,6 +133,9 @@ def build_table(
         start_time, end_time = cycle_bounds(frame, cycle)
         record["start_time"] = start_time
         record["end_time"] = end_time
+        # Row indices into `frame`, so a caller can pull this cycle's raw
+        # waveform back out without re-matching on timestamps.
+        record["start_row"], record["end_row"] = cycle
         records.append(record)
     return pd.DataFrame(records)
 
