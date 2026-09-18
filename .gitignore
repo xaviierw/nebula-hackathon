@@ -2,3 +2,20 @@
 Backend/02_Datasets/
 Backend/03_References/
 Backend/04_Example_Submission/
+
+# Virtual environments
+.venv/
+venv/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+# Generated artefacts - keep the folders, ignore everything produced into them.
+# Git cannot track an empty directory, so a .gitkeep placeholder is committed
+# in each and re-included by the negation patterns below.
+Backend/Door/model/*
+Backend/Door/output/*
+!Backend/Door/model/.gitkeep
+!Backend/Door/output/.gitkeep
