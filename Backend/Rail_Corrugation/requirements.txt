@@ -1,0 +1,7 @@
+# Inference dependencies for the saved model (trained with Python 3.12).
+# Notebook plotting tools are not required by predictor.py.
+numpy==2.3.3
+pandas==2.3.3
+scipy==1.16.2
+scikit-learn==1.7.2
+joblib==1.5.3
