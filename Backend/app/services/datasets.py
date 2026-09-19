@@ -18,6 +18,8 @@ MAX_FILENAMES = 20
 
 def touch(db, digest: str, *, size_bytes: int, filename: str, subsystem: str) -> None:
     """Record that a file with this hash was seen. Failures are non-fatal."""
+    if db is None:  # DEV_NO_AUTH: no Firestore
+        return
     try:
         ref = db.collection(COLLECTION).document(digest)
         snap = ref.get()

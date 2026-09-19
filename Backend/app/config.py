@@ -47,6 +47,17 @@ class Settings(BaseSettings):
     prediction_cache_enabled: bool = True
     log_level: str = "info"
 
+    # --- Local development ----------------------------------------------
+    # Skip Firebase entirely: no service-account key, no Firestore, and every
+    # request attributed to one fake user. It exists so the model path can be
+    # exercised end to end before the Firebase project is set up, and so a
+    # teammate without a key can still run the whole app.
+    #
+    # With this on there is NO authentication of any kind. main.py refuses to
+    # start unless the server is bound to loopback, and logs a banner every
+    # time, because the failure mode of shipping it by accident is total.
+    dev_no_auth: bool = False
+
     @property
     def allowed_domains(self) -> list[str]:
         return [d.strip().lower() for d in self.allowed_email_domains.split(",") if d.strip()]

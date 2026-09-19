@@ -32,6 +32,8 @@ def cache_key(subsystem: str, model_version: str, digest: str) -> str:
 
 def get(db, key: str) -> dict | None:
     """Return a cached payload, or None. Never raises on a cache miss."""
+    if db is None:  # DEV_NO_AUTH: no Firestore, so every lookup is a miss
+        return None
     try:
         snap = db.collection(COLLECTION).document(key).get()
     except Exception:
@@ -69,6 +71,9 @@ def put(
     tempting, but a transient error written into a shared cache becomes
     permanent for everyone.
     """
+    if db is None:  # DEV_NO_AUTH: nothing to write to
+        return
+
     body = json.dumps(payload, separators=(",", ":"))
     if len(body) > MAX_PAYLOAD_BYTES:
         log.warning(

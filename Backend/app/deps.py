@@ -33,6 +33,28 @@ class AuthError(ApiError):
     status_code = 401
 
 
+DEV_USER = CurrentUser(
+    uid="dev-local",
+    email="dev@localhost",
+    name="Local Dev",
+    picture=None,
+    email_verified=True,
+)
+
+
+def get_db_dep():
+    """The Firestore handle, or None when DEV_NO_AUTH is on.
+
+    None is a supported value here, not a degraded one: every database call on
+    the prediction path is already best-effort and non-fatal, so skipping them
+    costs the shared cache, the run history and the dataset counters, and
+    nothing else. The model still runs and the result still comes back.
+    """
+    if get_settings().dev_no_auth:
+        return None
+    return get_db()
+
+
 def get_current_user(
     cred: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> CurrentUser:
@@ -43,6 +65,11 @@ def get_current_user(
     cold. FastAPI runs sync dependencies in a threadpool; an async version
     would stall the event loop on every request.
     """
+    # Checked before the credential, not after: with the bypass on there is no
+    # Firebase app initialised at all, so verify_token could not run anyway.
+    if get_settings().dev_no_auth:
+        return DEV_USER
+
     if cred is None or not cred.credentials:
         raise AuthError("Sign in to continue.")
 
@@ -91,4 +118,4 @@ def _check_membership(email: str | None) -> None:
 
 
 CurrentUserDep = Annotated[CurrentUser, Depends(get_current_user)]
-DbDep = Annotated[object, Depends(get_db)]
+DbDep = Annotated[object | None, Depends(get_db_dep)]

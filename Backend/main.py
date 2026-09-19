@@ -14,6 +14,7 @@ See README.md in this directory for the full design.
 from __future__ import annotations
 
 import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -30,6 +31,33 @@ from app.subsystems.registry import all_runners, load_all
 log = logging.getLogger(__name__)
 
 
+def _refuse_unless_loopback() -> None:
+    """Hard-stop DEV_NO_AUTH on anything but a loopback bind.
+
+    config.HOST is pinned to 127.0.0.1, but uvicorn is normally started from
+    the command line, where --host overrides it. Reading argv is the only way
+    this process can see the address it was actually given, so that is what
+    gets checked. This is a backstop against one careless command, not a
+    security boundary -- the real guarantee is that DEV_NO_AUTH never reaches
+    a deployed environment.
+    """
+    argv = sys.argv
+    host = None
+    for i, arg in enumerate(argv):
+        if arg == "--host" and i + 1 < len(argv):
+            host = argv[i + 1]
+        elif arg.startswith("--host="):
+            host = arg.split("=", 1)[1]
+
+    if host is not None and host not in ("127.0.0.1", "localhost", "::1"):
+        raise RuntimeError(
+            f"DEV_NO_AUTH is set but this server was told to bind {host}.\n"
+            "The bypass disables authentication completely and is refused on "
+            "any non-loopback address. Unset DEV_NO_AUTH in Backend/.env, or "
+            "bind 127.0.0.1."
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
@@ -38,9 +66,22 @@ async def lifespan(app: FastAPI):
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     )
 
-    # Fails loudly and deliberately. Every route requires a verified token, so
-    # a server that cannot verify tokens is not partially useful.
-    init_firebase(settings)
+    if settings.dev_no_auth:
+        _refuse_unless_loopback()
+        log.warning(
+            "\n"
+            "  ==========================================================\n"
+            "   DEV_NO_AUTH is ON. There is NO authentication.\n"
+            "   Every request runs as the fake user 'dev-local', and\n"
+            "   Firestore is disabled: no cache, no run history.\n"
+            "   Local development only. Never deploy with this set.\n"
+            "  =========================================================="
+        )
+    else:
+        # Fails loudly and deliberately. Every route requires a verified
+        # token, so a server that cannot verify tokens is not partially
+        # useful.
+        init_firebase(settings)
 
     # Degrades per subsystem: one model missing must never take down the rest.
     load_all()
@@ -98,6 +139,13 @@ def create_app() -> FastAPI:
             "firebase": bool(firebase_admin._apps),
             "subsystems": [r.info() for r in all_runners()],
         }
+
+    if settings.dev_no_auth:
+        # Visible proof the bypass is on, so "why is it not asking me to sign
+        # in" is answerable without reading the server log.
+        @app.get(f"{API_PREFIX}/dev-status", tags=["meta"])
+        def dev_status():
+            return {"dev_no_auth": True, "user": "dev-local", "firestore": False}
 
     return app
 

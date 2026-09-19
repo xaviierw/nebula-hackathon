@@ -58,6 +58,18 @@ class SubsystemUnavailableError(ApiError):
     status_code = 503
 
 
+def is_domain_error(exc: BaseException) -> bool:
+    """True for a subsystem's own <X>InputError / <X>ModelError.
+
+    Matched by name rather than by import so this module never has to know
+    which subsystems exist, or drag their packages onto sys.path.
+    """
+    return any(
+        base.__name__.endswith(("InputError", "ModelError"))
+        for base in type(exc).__mro__
+    )
+
+
 def _json(status: int, message: str, headers: dict | None = None) -> JSONResponse:
     return JSONResponse({"message": message}, status_code=status, headers=headers)
 
@@ -89,6 +101,22 @@ def install_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def _unhandled(_: Request, exc: Exception):
+        # A subsystem's own error reaches here rather than through an
+        # @exception_handler of its own: those classes live outside this
+        # package (Backend/Door/core/errors.py and its siblings) and are only
+        # importable once that subsystem is on sys.path, so this module cannot
+        # name them. Starlette dispatches handlers by class, so the catch-all
+        # is the one place that can see them.
+        #
+        # <X>InputError messages are written for a non-technical reader and
+        # are contractually safe to show verbatim -- that is the whole point
+        # of the type. <X>ModelError means a missing or broken artifact: real
+        # but not the user's fault, hence 503 rather than 400.
+        if is_domain_error(exc):
+            status = 503 if type(exc).__name__.endswith("ModelError") else 400
+            log.info("%s: %s", type(exc).__name__, exc)
+            return _json(status, str(exc))
+
         # Never echo an arbitrary exception string: that is how file paths and
         # stack internals leak into a user-facing message.
         log.exception("Unhandled error", exc_info=exc)

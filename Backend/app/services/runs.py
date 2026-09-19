@@ -25,6 +25,8 @@ def record(db, uid: str, **fields) -> str | None:
     Called for failures as well as successes (status="error"), so a user can
     see that a file was rejected and why.
     """
+    if db is None:  # DEV_NO_AUTH: no history is kept
+        return None
     try:
         ref = _runs(db, uid).document()
         ref.set({**fields, "run_id": ref.id, "created_at": firestore.SERVER_TIMESTAMP})
@@ -36,6 +38,8 @@ def record(db, uid: str, **fields) -> str | None:
 
 def list_runs(db, uid: str, limit: int = 50, cursor: str | None = None):
     """Newest first, cursor-paginated. Returns (runs, next_cursor)."""
+    if db is None:  # DEV_NO_AUTH: nothing was ever recorded
+        return [], None
     query = _runs(db, uid).order_by("created_at", direction=firestore.Query.DESCENDING)
     if cursor:
         anchor = _runs(db, uid).document(cursor).get()
@@ -49,5 +53,7 @@ def list_runs(db, uid: str, limit: int = 50, cursor: str | None = None):
 
 def get_run(db, uid: str, run_id: str) -> dict | None:
     """One run, scoped to this user by path construction."""
+    if db is None:  # DEV_NO_AUTH: nothing was ever recorded
+        return None
     snap = _runs(db, uid).document(run_id).get()
     return snap.to_dict() if snap.exists else None

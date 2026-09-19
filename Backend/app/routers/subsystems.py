@@ -20,6 +20,7 @@ from ..errors import (
     PayloadTooLargeError,
     SubsystemNotImplementedError,
     SubsystemUnavailableError,
+    is_domain_error,
 )
 from ..schemas.common import BatchItem, BatchResponse, ErrorResponse
 from ..services import cache, datasets, runs
@@ -90,7 +91,7 @@ def build_subsystem_router(subsystem_id: str) -> APIRouter:
                     BatchItem(filename=f.filename or "", ok=False, message=exc.message)
                 )
             except Exception as exc:
-                if _is_domain_error(exc):
+                if is_domain_error(exc):
                     items.append(
                         BatchItem(filename=f.filename or "", ok=False, message=str(exc))
                     )
@@ -146,7 +147,7 @@ async def _predict_one(request, user, db, file: UploadFile, subsystem_id: str):
                 # Off the event loop: the model is synchronous pandas work.
                 payload = await run_in_threadpool(runner.run, raw, filename)
             except Exception as exc:
-                if _is_domain_error(exc):
+                if is_domain_error(exc):
                     runs.record(
                         db, user.uid,
                         subsystem=runner.id, filename=filename, size_bytes=len(raw),
@@ -186,14 +187,3 @@ def _is_stub(runner) -> bool:
 
     return isinstance(runner, NotImplementedRunner)
 
-
-def _is_domain_error(exc: Exception) -> bool:
-    """True for a subsystem's own <X>InputError / <X>ModelError.
-
-    Matched by name rather than by import so this module never has to know
-    which subsystems exist, or drag their packages onto sys.path.
-    """
-    return any(
-        base.__name__.endswith(("InputError", "ModelError"))
-        for base in type(exc).__mro__
-    )
