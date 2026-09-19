@@ -27,3 +27,9 @@ pandas==2.3.3
 scipy==1.16.2
 scikit-learn==1.7.2
 joblib==1.5.3
+
+# --- Inference tier (also supplies Door's pandas/numpy requirements) -------
+-r SHM/requirements-inference.txt
+
+# scikit-learn is deliberately absent. Training runs under WSL; the prediction
+# path this API calls is sklearn-free by design -- see Backend/Door/core/classifier.py.

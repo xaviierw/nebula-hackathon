@@ -7,6 +7,9 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Tailwind is handled by its Vite plugin; do not inherit unrelated configs
+  // from a developer's parent directories.
+  css: { postcss: { plugins: [] } },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

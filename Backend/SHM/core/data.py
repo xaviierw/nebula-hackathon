@@ -1,40 +1,31 @@
-"""Reading and validating a SHM input file.
-
-Mirrors Backend/Door/core/data.py. Keep reading separate from parsing so a
-caller can validate the schema first and report a readable error, rather than
-failing inside a parser on a file that was never a SHM recording.
-"""
-
+"""Strict headerless recording reader; paths and in-memory streams are supported."""
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from .errors import ShmInputError
 
-# TODO: the exact column names from the SHM info kit in
-# Backend/03_References/SHM/. Door keeps its equivalents in core/data.py:19-25.
-REQUIRED_COLUMNS: list[str] = []
+OBSERVATIONS = 581120
 
 
-def read_raw(path) -> pd.DataFrame:
-    """Read a SHM file without touching its contents.
-
-    `path` may be a path OR a file-like object -- the API passes an
-    io.BytesIO of the upload, and never writes it to disk.
-    """
-    return pd.read_csv(path)
-
-
-def check_schema(frame: pd.DataFrame) -> None:
-    """Fail early and legibly if this is not a SHM recording."""
-    missing = [c for c in REQUIRED_COLUMNS if c not in frame.columns]
-    if missing:
+def check_schema(frame: pd.DataFrame, expected_rows: int = OBSERVATIONS) -> None:
+    if frame.shape != (expected_rows, 1):
         raise ShmInputError(
-            "Input file is missing required column(s):\n"
-            + "".join(f"  - {c}\n" for c in missing)
-            + "\nFound these columns instead:\n"
-            + "".join(f"  - {c}\n" for c in frame.columns)
-            + "\nExpected a SHM recording."
+            f"Expected {expected_rows:,} observations in exactly one column without a header; "
+            f"received {frame.shape[0]:,} rows and {frame.shape[1]} columns."
         )
-    if frame.empty:
-        raise ShmInputError("Input file contains no data rows.")
+    if not pd.api.types.is_numeric_dtype(frame.iloc[:, 0]) or not np.isfinite(frame.to_numpy()).all():
+        raise ShmInputError("Stress observations must all be numeric and finite, without missing values or a header.")
+
+
+def read_raw(path, expected_rows: int = OBSERVATIONS) -> pd.DataFrame:
+    try:
+        frame = pd.read_csv(path, header=None, dtype="float64", skip_blank_lines=False)
+    except (ValueError, UnicodeError, pd.errors.ParserError, pd.errors.EmptyDataError) as exc:
+        raise ShmInputError(
+            f"Expected {expected_rows:,} rows of finite numeric stress values in one column, "
+            "without a header, missing values or extra columns."
+        ) from exc
+    check_schema(frame, expected_rows)
+    return frame

@@ -13,7 +13,7 @@ class ShmError(Exception):
     """Base class for every SHM subsystem error."""
 
 
-class ShmInputError(ShmError):
+class ShmInputError(ShmError, ValueError):
     """The supplied file cannot be processed.
 
     Wrong columns, no data rows, unparseable values. THE MESSAGE IS SHOWN TO
