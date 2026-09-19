@@ -5,9 +5,9 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-from data import require, write_json
-from models import fit_model
-from splits import make_splits, target_strata
+from .data import require, write_json
+from .models import fit_model
+from .splits import make_splits, target_strata
 
 
 def evaluate_candidates(frame, candidates, seeds, folds=5, balanced=True, context="cv"):

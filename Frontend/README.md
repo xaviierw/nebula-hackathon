@@ -1,8 +1,8 @@
 # Nebula Frontend
 
 The single app that houses every subsystem model, as required by the hackathon
-brief (§4.1 item 3). This is currently a **navigation skeleton only** — no
-uploads, no predictions, no backend calls.
+brief). SHM uploads recordings to the shared authenticated API and downloads
+full-precision CSV predictions. See [SHM setup](../Backend/SHM/APP.md).
 
 ## Running it
 
@@ -22,7 +22,7 @@ Other scripts: `npm run build`, `npm run preview`, `npm run lint` (oxlint).
 | `src/subsystems.ts` | The four subsystems, declared once |
 | `src/pages/subsystems/` | One page per subsystem — **build your subsystem here** |
 | `src/components/` | Shared UI (`AppShell`, `SubsystemCard`) |
-| `src/auth/` | Placeholder auth + the route guard |
+| `src/auth/` | Firebase auth, session restoration and the route guard |
 | `src/api/client.ts` | `apiFetch()` — the single place to call the backend |
 
 ## Adding your subsystem
@@ -34,8 +34,10 @@ name or blurb.
 
 ## Things to know
 
-- **Login accepts anything**, including an empty form. `src/auth/AuthProvider.tsx`
-  is the one file to change when real auth arrives.
+- Copy `.env.example` to `.env.local` and enter public Firebase web app values.
+  Sign in with an existing Email/Password account in that project. The shared
+  backend must use the same project. There is no demo login or auth bypass.
+- `npm test` runs simulated-auth client, session and SHM workflow tests.
 - **Tailwind v4** — there is no `tailwind.config.js` and v4 does not use one.
   Do not run `npx tailwindcss init`; that is v3 muscle memory.
 - **Call the API with `apiFetch('/door/predict', ...)`**, not an absolute URL.

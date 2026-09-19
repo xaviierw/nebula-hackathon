@@ -2,7 +2,7 @@
 import numpy as np
 from sklearn.model_selection import KFold, StratifiedKFold
 
-from data import require
+from .data import require
 
 
 def target_strata(y):

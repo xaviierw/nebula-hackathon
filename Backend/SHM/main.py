@@ -1,6 +1,13 @@
 """SHM CLI: audit, development CV, frozen nested validation, and inference."""
 from __future__ import annotations
 
+# Preserve direct-script CLI commands without exposing SHM's modules at top level.
+if __package__ in (None, ""):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    __package__ = "SHM"
+
 import argparse
 from dataclasses import asdict
 import hashlib
@@ -11,15 +18,13 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from data import CACHE_VERSION, OBSERVATIONS, audit_dataset, extract_file, require, write_json
-from models import Candidate, FittedModel, candidates, fit_model
-from validation import (evaluate_candidates, nested_validation, save_parameter_summary,
-                        save_reports, select_candidate)
+from .data import CACHE_VERSION, OBSERVATIONS, audit_dataset, extract_file, require, write_json
 
 HERE = Path(__file__).resolve().parent
 
 
 def default_protocol(include_hybrid=False, hybrid_reason=None):
+    from .models import candidates
     require(not include_hybrid or bool(hybrid_reason), "Record the residual evidence with --hybrid-reason when enabling a hybrid")
     return dict(version=1, development_seeds=[11, 22, 33, 44, 55],
         outer_seeds=[101, 202, 303, 404, 505], sensitivity_seeds=[606, 707, 808],
@@ -33,6 +38,7 @@ def default_protocol(include_hybrid=False, hybrid_reason=None):
 
 
 def load_protocol(args):
+    from .models import Candidate, candidates
     protocol = json.loads(args.protocol.read_text(encoding="utf-8")) if args.protocol else default_protocol(args.include_hybrid, args.hybrid_reason)
     reference = default_protocol()
     for key, count in [("development_seeds", 5), ("outer_seeds", 5), ("sensitivity_seeds", 3), ("refit_seeds", 5)]:
@@ -61,6 +67,7 @@ def freeze_protocol(output, protocol, frame):
 
 
 def run_development(train, cs, protocol, output):
+    from .validation import evaluate_candidates, save_reports, select_candidate
     print(f"Development: {len(cs)} candidates, 5 folds x 5 repeats", flush=True)
     oof, splits, fits = evaluate_candidates(train, cs, protocol["development_seeds"], context="development")
     output.mkdir(parents=True, exist_ok=True)
@@ -74,6 +81,9 @@ def run_development(train, cs, protocol, output):
 
 
 def run_final(train, test, cs, protocol, output, protocol_hash):
+    from .models import FittedModel, fit_model
+    from .validation import (evaluate_candidates, nested_validation, save_parameter_summary,
+                             save_reports, select_candidate)
     output.mkdir(parents=True, exist_ok=True)
     for label, seeds, balanced in [("balanced", protocol["outer_seeds"], True),
                                   ("unbalanced_sensitivity", protocol["sensitivity_seeds"], False)]:
@@ -116,18 +126,21 @@ def run_final(train, test, cs, protocol, output, protocol_hash):
 
 
 def predict(args):
-    from inference import DEFAULT_MODEL, Predictor
+    from .core.data import read_raw
+    from .core.model import MODEL_PATH, ShmModel
+    from .prediction.predict import predict_file
+
     require(args.input is not None, "predict requires --input")
-    predictor = Predictor(args.model or DEFAULT_MODEL)
+    model = ShmModel.load(args.model or MODEL_PATH)
     files = sorted(args.input.glob("*.csv"))
     require(len(files) > 0, "No input CSV files")
-    records = [predictor.predict(p.read_bytes(), p.name) for p in files]
+    records = [{"file_id": p.name, **predict_file(read_raw(p), model)} for p in files]
     args.output.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(records)[['file_id', 'prediction']].to_csv(args.output, index=False)
     print(f"Saved {len(files)} predictions to {args.output}", flush=True)
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["audit", "develop", "final", "all", "predict"], nargs="?", default="all")
     parser.add_argument("--data", type=Path, default=HERE / "dataset_shm" / "SHM")
@@ -139,7 +152,7 @@ def main():
     parser.add_argument("--hybrid-reason", help="Evidence for enabling residual correction; recorded in protocol")
     parser.add_argument("--model", type=Path)
     parser.add_argument("--input", type=Path, help="Inference-only directory containing stress CSVs")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.output is None:
         args.output = HERE / "shm_predictions.csv" if args.command == "predict" else HERE / "outputs" / "grouped"
     if args.command == "predict":

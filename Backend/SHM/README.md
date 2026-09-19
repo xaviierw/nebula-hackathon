@@ -2,7 +2,6 @@
 
 **Live frontend integration:** see [APP.md](APP.md) for the API/frontend startup
 commands, upload/download workflow, packaged artifact and submission instructions.
-See [REFINEMENT_RESULTS.md](REFINEMENT_RESULTS.md) for the completed hard-case study.
 
 One complete stress CSV is one independent labelled modelling unit. This pipeline
 preserves raw stress magnitudes, extracts rainflow amplitudes (`range / 2`), and
@@ -34,7 +33,7 @@ detrending, binning, or dropping endpoint half cycles is performed.
 Run tests with:
 
 ```powershell
-.venv/Scripts/python.exe -m pytest Backend/SHM/tests -q
+.venv/Scripts/python.exe -m pytest Backend/SHM/tests/test_pipeline.py Backend/SHM/tests/test_api.py -q
 ```
 
 In Colab, place this SHM directory in the runtime or mounted Drive, install
@@ -159,82 +158,47 @@ Source: `Backend/01_Problem_Statement_3_Specifications.md` section 4.1.
 
 ---
 
-## What you need to deliver
+## Shared inference package
 
-Fill in the skeleton:
+The implementation is complete in `core/data.py`, `core/features.py`,
+`core/model.py` and `prediction/predict.py`, registered by `ShmRunner` in the
+shared `Backend/main.py` app. The only deployed artifact is
+`artifacts/model.json`; `model/shm_model.json` was a scaffold placeholder and
+is never loaded. `data.py` re-exports the authoritative mechanics for offline
+training. All SHM imports are qualified/relative, so Door's top-level path shim
+cannot shadow them.
 
-```
+Use `requirements-inference.txt` for standalone CLI inference or the shared
+`Backend/requirements.txt` for serving; neither requires scikit-learn.
+`requirements.txt` adds offline training/test dependencies. The shared backend
+includes the same inference requirements, so runtime versions have one source.
+Training/validation remain in `main.py`, `data.py`, `models.py`, `splits.py` and
+`validation.py`; the unused `training/` wrappers have been removed. No training
+procedure was changed.
+
+The final layout is:
+
+```text
 SHM/
-  core/data.py             column constants, read_raw(), check_schema()
-  core/features.py         feature extraction
-  core/model.py            load + predict
-  core/errors.py           already written -- ShmInputError / ShmModelError
-  training/train.py        fits, selects, writes ./model artifacts
-  training/evaluate.py     scores against the info kit fixed metric
-  prediction/predict.py    <- THE ONE FILE THE API CALLS
+  __init__.py
+  artifacts/model.json       sole deployed artifact
+  core/                     strict parsing, fatigue features, model, errors
+  prediction/predict.py     pure prediction shared by API and CLI
+  predict.py                preserved CLI shortcut
+  main.py                   audit/develop/final/all/predict commands
+  data.py                   offline dataset audit and feature caching
+  models.py                 offline candidate fitting/evaluation
+  splits.py, validation.py  offline validation protocol
+  tests/                    mechanics, API/CLI parity, browser checks
+  requirements-inference.txt
+  requirements.txt          offline training and test dependencies
 ```
 
-### The only signature that is not yours to choose
+`inference.py`, `requirements-api.txt`, and the empty `model/` and `output/`
+scaffold placeholders have been removed. CLI prediction now calls the core
+reader, model loader and pure prediction function directly. Runtime outputs
+remain in ignored `outputs/`; existing refinement work remains separate.
 
-```python
-# prediction/predict.py
-
-def predict_file(frame: pd.DataFrame, model, reference: dict | None = None) -> dict:
-    ...
-```
-
-Returning, for this subsystem:
-
-```python
-{"prediction": 0.0421, "interval": [0.031, 0.055], "warnings": []}
-```
-
-Three rules, all learned the hard way on Door:
-
-1. **Raise, never `sys.exit`.** Use `ShmInputError` / `ShmModelError` from
-   `core/errors.py`. `SystemExit` inherits from `BaseException`, so a caller
-   `except Exception` misses it and the whole server dies instead of showing
-   the message.
-2. **`ShmInputError` messages are shown to users verbatim.** Write them for a
-   non-technical reader. Multi-line is fine.
-3. **Return plain `int` / `float` / `str`.** `np.int64` is not a subclass of
-   `int`, and the API response validation rejects it.
-
-Keep `predict_file` deterministic. The API caches results by file hash and
-will not re-run your model on a file it has already seen.
-
----
-
-## Wiring it into the API
-
-When `predict_file` works, it is a **two-file change** and you write no routes:
-
-1. Fill in `Backend/app/subsystems/shm/runner.py` -- copy
-   `Backend/app/subsystems/door/runner.py`, which is the worked reference.
-2. In `Backend/app/subsystems/registry.py`, replace
-
-   ```python
-   register(NotImplementedRunner("shm", "SHM"))
-   ```
-   with
-   ```python
-   register(ShmRunner())
-   ```
-
-Auth, the shared prediction cache, per-user history and error mapping all come
-for free. Confirm it worked:
-
-```bash
-curl.exe http://127.0.0.1:8000/api/health
-```
-
-Your subsystem should report `"available": true` with a real `model_version`.
-
-> **Import-name collision.** Door currently occupies the top-level module names
-> `core`, `training` and `prediction` via its `vendor_path.py` shim. The second
-> subsystem wired into the API **cannot** reuse those names. Give this
-> directory a package root, or rename its modules to `shm_core` /
-> `shm_prediction`, before you wire up. See `Backend/README.md`.
-
----
-
+See [APP.md](APP.md) for Firebase configuration, the sole server startup command,
+response/cache contracts, CLI prediction, tests and files to commit. The former
+standalone `api.py` server and demo authentication instructions are obsolete.

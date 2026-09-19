@@ -1,28 +1,29 @@
 import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/useAuth'
 
-/**
- * Placeholder login. There is no validation: submitting the form empty is the
- * intended way in. It is a real <form> with preventDefault so that pressing
- * Enter navigates instead of reloading the page.
- */
 export function LoginPage() {
-  const { isAuthed, login } = useAuth()
-  const navigate = useNavigate()
+  const { isAuthed, loading, error: authError, login } = useAuth()
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+
+  if (loading) return <p role="status" className="p-8">Restoring your session...</p>
 
   // Already signed in - skip the form rather than leaving a dead end behind Back.
   if (isAuthed) {
     return <Navigate to="/home" replace />
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    login()
-    navigate('/home', { replace: true })
+    setSubmitting(true)
+    setError('')
+    try { await login(email, password) }
+    catch (caught) { setError(caught instanceof Error ? caught.message : 'Sign-in failed.') }
+    finally { setSubmitting(false) }
   }
 
   return (
@@ -38,6 +39,7 @@ export function LoginPage() {
               Email
             </label>
             <input
+              required
               id="email"
               type="email"
               autoComplete="email"
@@ -52,6 +54,7 @@ export function LoginPage() {
               Password
             </label>
             <input
+              required
               id="password"
               type="password"
               autoComplete="current-password"
@@ -63,15 +66,14 @@ export function LoginPage() {
 
           <button
             type="submit"
+            disabled={submitting}
             className="w-full rounded-md bg-sky-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
           >
             Log In
           </button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-slate-500">
-          Authentication is not implemented yet — submit the form empty to continue.
-        </p>
+        {(error || authError) && <p role="alert" className="mt-6 text-sm text-red-700">{error || authError}</p>}
       </div>
     </div>
   )

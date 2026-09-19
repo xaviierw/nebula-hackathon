@@ -6,8 +6,8 @@ from scipy.optimize import linprog
 from sklearn.linear_model import Ridge
 from sklearn.preprocessing import StandardScaler
 
-from data import EXPONENTS, logq_column, mean_column, require
-from splits import make_splits
+from .data import EXPONENTS, logq_column, mean_column, require
+from .splits import make_splits
 
 
 @dataclass(frozen=True)

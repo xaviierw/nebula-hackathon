@@ -1,20 +1,14 @@
-"""SHM response contract -- PROVISIONAL, owned by its builder.
-
-Submission schema (Backend/01_Problem_Statement_3_Specifications.md section 4.1):
-    shm_predictions.csv -> file_id,prediction
-    prediction is a single numeric cumulative-damage value.
-"""
-
-from __future__ import annotations
-
-from pydantic import BaseModel
+"""SHM content-only response; upload identifiers remain request metadata."""
+from pydantic import BaseModel, Field
 
 from .common import Warning_
 
 
 class ShmResult(BaseModel):
-    # Cumulative fatigue damage. Regression, so this is a bare number.
-    prediction: float
-    # Optional [low, high] uncertainty band, for display.
-    interval: list[float] | None = None
-    warnings: list[Warning_] = []
+    prediction: float = Field(gt=0, allow_inf_nan=False)
+    observations: int = Field(gt=0)
+    weighted_cycle_count: float = Field(gt=0, allow_inf_nan=False)
+    model_id: str
+    model_version: str
+    interval: None = None  # No validated uncertainty interval is available.
+    warnings: list[Warning_] = Field(default_factory=list)

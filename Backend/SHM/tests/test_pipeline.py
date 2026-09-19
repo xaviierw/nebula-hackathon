@@ -4,11 +4,11 @@ import pandas as pd
 import pytest
 import rainflow
 
-from data import (EXPONENTS, extract_file, extract_signal, fingerprints, logq_column,
+from SHM.data import (EXPONENTS, extract_file, extract_signal, fingerprints, logq_column,
                   mean_column, read_signal, validate_inventory, waveform_relationship)
-from models import Candidate, FittedModel, fit_log_scale, fit_model
-from splits import make_splits
-from validation import nested_validation, select_candidate, summarise
+from SHM.models import Candidate, FittedModel, fit_log_scale, fit_model
+from SHM.splits import make_splits
+from SHM.validation import nested_validation, select_candidate, summarise
 
 
 def synthetic_frame(n=24):
@@ -165,7 +165,7 @@ def test_outer_labels_cannot_change_that_folds_selection_or_prediction():
 
 
 def test_training_only_scaling_and_hybrid_crossfit(monkeypatch):
-    import models
+    from SHM import models
     frame = synthetic_frame()
     seen = []
     original = models.fit_log_scale

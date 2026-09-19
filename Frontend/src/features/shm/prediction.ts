@@ -1,4 +1,4 @@
-import { apiFetch } from '../../api/client'
+import { apiFetch, SessionError } from '../../api/client'
 
 export interface ShmPrediction {
   file_id: string
@@ -6,6 +6,9 @@ export interface ShmPrediction {
   observations: number
   weighted_cycle_count: number
   model_id: string
+  model_version: string
+  interval: null
+  warnings: { code: string; severity: string; message: string }[]
 }
 
 export const MAX_FILE_BYTES = 16 * 1024 * 1024
@@ -17,25 +20,29 @@ export async function predictShm(file: File): Promise<ShmPrediction> {
   let response: Response
   try {
     response = await apiFetch('/shm/predict', { method: 'POST', body })
-  } catch {
+  } catch (error) {
+    if (error instanceof SessionError) throw error
     throw new Error('Cannot reach the prediction service. Check that the backend is running, then retry.')
   }
   if (!response.ok) {
-    const problem = await response.json().catch(() => null) as { detail?: unknown } | null
-    throw new Error(typeof problem?.detail === 'string' ? problem.detail
+    const problem = await response.json().catch(() => null) as { message?: unknown } | null
+    throw new Error(typeof problem?.message === 'string' ? problem.message
       : 'The prediction service could not process this recording. Check the backend and retry.')
   }
   const result: ShmPrediction = await response.json()
-  if (result.file_id !== file.name || !Number.isFinite(result.prediction) || result.prediction <= 0
-      || typeof result.model_id !== 'string') {
+  if (!Number.isFinite(result.prediction) || result.prediction <= 0
+      || typeof result.model_id !== 'string' || !result.model_id
+      || typeof result.model_version !== 'string' || !result.model_version
+      || result.observations !== 581120 || !Number.isFinite(result.weighted_cycle_count)
+      || result.weighted_cycle_count <= 0 || result.interval !== null || !Array.isArray(result.warnings)) {
     throw new Error('The service returned an invalid prediction. Please retry.')
   }
-  return result
+  return { ...result, file_id: file.name }
 }
 
 export function buildShmCsv(results: ShmPrediction[]): string {
   if (!results.length || new Set(results.map(r => r.file_id)).size !== results.length
-      || new Set(results.map(r => r.model_id)).size !== 1
+      || new Set(results.map(r => r.model_version)).size !== 1
       || results.some(r => !Number.isFinite(r.prediction) || r.prediction <= 0)) {
     throw new Error('Predictions must be unique, finite and from the same model.')
   }

@@ -74,10 +74,9 @@ Backend/Rail_Corrugation/model/*
 Backend/Rail_Corrugation/output/*
 !Backend/Rail_Corrugation/model/.gitkeep
 !Backend/Rail_Corrugation/output/.gitkeep
-Backend/SHM/model/*
-Backend/SHM/output/*
-!Backend/SHM/model/.gitkeep
-!Backend/SHM/output/.gitkeep
+# Retired SHM scaffold directories; actual outputs live in SHM/outputs/.
+Backend/SHM/model/
+Backend/SHM/output/
 
 # Python bytecode from the API tier.
 Backend/**/__pycache__/

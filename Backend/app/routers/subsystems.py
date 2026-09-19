@@ -154,6 +154,8 @@ async def _predict_one(request, user, db, file: UploadFile, subsystem_id: str):
                         cache_key=key, cache_hit=False, status="error",
                         error_message=str(exc),
                     )
+                    status = 503 if any(base.__name__.endswith("ModelError") for base in type(exc).__mro__) else 400
+                    raise ApiError(str(exc), status) from exc
                 raise
             duration_ms = int((time.perf_counter() - started) * 1000)
             if settings.prediction_cache_enabled:

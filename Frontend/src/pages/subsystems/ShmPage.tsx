@@ -54,10 +54,10 @@ export function ShmPage() {
         setRows([...batch])
         try {
           const result = await predictShm(batch[i].file)
-          if (modelId !== undefined && result.model_id !== modelId) {
+          if (modelId !== undefined && result.model_version !== modelId) {
             throw new Error('The model changed during this batch. Run the batch again before downloading.')
           }
-          modelId = result.model_id
+          modelId = result.model_version
           batch[i] = { ...batch[i], result, status: 'done' }
         } catch (caught) {
           batch[i] = { ...batch[i], status: 'error', error: caught instanceof Error ? caught.message : 'Prediction failed.' }

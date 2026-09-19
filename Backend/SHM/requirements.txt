@@ -1,6 +1,5 @@
-numpy==2.2.6
-pandas==2.2.3
-scipy==1.15.3
+-r requirements-inference.txt
+# Offline training and validation only
 scikit-learn==1.6.1
-rainflow==3.2.0
 pytest==8.3.5
+httpx==0.28.1  # Shared API tests; install Backend/requirements.txt as well.

@@ -8,6 +8,7 @@ import { useAuth } from './useAuth'
  * repeated on every protected page.
  */
 export function RequireAuth() {
-  const { isAuthed } = useAuth()
+  const { isAuthed, loading } = useAuth()
+  if (loading) return <p role="status" className="p-8">Restoring your session...</p>
   return isAuthed ? <Outlet /> : <Navigate to="/login" replace />
 }
