@@ -154,10 +154,9 @@ async def _predict_one(
         digest = sha256_hex(raw)
         key = cache.cache_key(runner.id, runner.model_version, digest)
 
-        persistence_enabled = not settings.local_dev_mode and db is not None
         payload = (
             cache.get(db, key)
-            if persistence_enabled and settings.prediction_cache_enabled
+            if settings.prediction_cache_enabled
             else None
         )
         cache_hit = payload is not None
@@ -169,7 +168,7 @@ async def _predict_one(
                 # Off the event loop: the model is synchronous pandas work.
                 payload = await run_in_threadpool(runner.run, raw, filename)
             except Exception as exc:
-                if _is_domain_error(exc) and persistence_enabled:
+                if _is_domain_error(exc):
                     runs.record(
                         db, user.uid,
                         subsystem=runner.id, filename=filename, size_bytes=len(raw),
@@ -179,7 +178,7 @@ async def _predict_one(
                     )
                 raise
             duration_ms = int((time.perf_counter() - started) * 1000)
-            if persistence_enabled and settings.prediction_cache_enabled:
+            if settings.prediction_cache_enabled:
                 cache.put(
                     db, key,
                     subsystem=runner.id, model_version=runner.model_version,
@@ -187,18 +186,16 @@ async def _predict_one(
                     duration_ms=duration_ms,
                 )
 
-        run_id = None
-        if persistence_enabled:
-            datasets.touch(
-                db, digest, size_bytes=len(raw), filename=filename, subsystem=runner.id
-            )
-            run_id = runs.record(
-                db, user.uid,
-                subsystem=runner.id, filename=filename, size_bytes=len(raw),
-                file_sha256=digest, model_version=runner.model_version,
-                cache_key=key, cache_hit=cache_hit, status="ok",
-                duration_ms=duration_ms, error_message=None,
-            )
+        datasets.touch(
+            db, digest, size_bytes=len(raw), filename=filename, subsystem=runner.id
+        )
+        run_id = runs.record(
+            db, user.uid,
+            subsystem=runner.id, filename=filename, size_bytes=len(raw),
+            file_sha256=digest, model_version=runner.model_version,
+            cache_key=key, cache_hit=cache_hit, status="ok",
+            duration_ms=duration_ms, error_message=None,
+        )
         return payload, {"cache_hit": cache_hit, "run_id": run_id}
     finally:
         # Requirement: uploaded bytes never outlive the request.

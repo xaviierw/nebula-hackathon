@@ -38,16 +38,9 @@ async def lifespan(app: FastAPI):
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     )
 
-    if settings.local_dev_mode:
-        log.warning(
-            "LOCAL_DEV_MODE is enabled: Firebase authentication, Firestore "
-            "cache and run history are disabled. Never deploy this mode."
-        )
-    else:
-        # Fails loudly and deliberately in normal mode. Every protected route
-        # requires a verified token, so a server that cannot verify tokens is
-        # not partially useful.
-        init_firebase(settings)
+    # Fails loudly and deliberately. Every protected route requires a verified
+    # token, so a server that cannot verify tokens is not partially useful.
+    init_firebase(settings)
 
     # Degrades per subsystem: one model missing must never take down the rest.
     load_all()
@@ -78,11 +71,8 @@ def create_app() -> FastAPI:
 
     install_error_handlers(app)
 
-    # Local mode has no identity store or run history. Omit those routes
-    # instead of exposing endpoints that could only fail against a null DB.
-    if not settings.local_dev_mode:
-        app.include_router(auth.router, prefix=f"{API_PREFIX}/auth", tags=["auth"])
-        app.include_router(users.router, prefix=f"{API_PREFIX}/users", tags=["users"])
+    app.include_router(auth.router, prefix=f"{API_PREFIX}/auth", tags=["auth"])
+    app.include_router(users.router, prefix=f"{API_PREFIX}/users", tags=["users"])
 
     # One router per subsystem, generated from the registry rather than
     # hand-written, so adding a model needs no change here.
