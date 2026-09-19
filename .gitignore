@@ -53,9 +53,7 @@ serviceAccountKey.json
 Frontend/.env
 
 # Generated artefacts for the new subsystems, matching Door's rules above.
-Backend/ACV/model/*
 Backend/ACV/output/*
-!Backend/ACV/model/.gitkeep
 !Backend/ACV/output/.gitkeep
 Backend/Rail_Corrugation/model/*
 Backend/Rail_Corrugation/output/*
