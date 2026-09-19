@@ -68,3 +68,15 @@ Backend/SHM/output/*
 
 # Python bytecode from the API tier.
 Backend/**/__pycache__/
+
+# The Door INFERENCE artefacts are committable: door_model.json is ~400 bytes
+# of plain numbers with no training data in it, and without it a fresh clone
+# has a dead Door endpoint (Train.csv is gitignored, so model/ is NOT in fact
+# reproducible from a clone).
+!Backend/Door/model/door_model.json
+!Backend/Door/model/door_reference.json
+
+# Rail's fitted Extra Trees bundle is also required for a fresh deployment.
+# It is validated against its feature contract and exact inference versions
+# at startup; training data remains ignored.
+!Backend/Rail_Corrugation/model/rail_corrugation.joblib

@@ -4,8 +4,8 @@
     python main.py predict --input <file>
     python main.py evaluate
 
-Mirrors Backend/Door/main.py. The API does NOT call this file -- it imports
-prediction/predict.py directly. Keep the two paths equivalent.
+Mirrors Backend/Door/main.py. The API does NOT call this file -- its runner
+imports Rail_Corrugation.prediction.predict directly.
 """
 
 from __future__ import annotations
@@ -24,7 +24,17 @@ def cmd_train(args) -> int:
 
 
 def cmd_predict(args) -> int:
-    raise NotImplementedError("Rail Corrugation predict CLI not written yet")
+    import pandas as pd
+
+    from predictor import predict_file
+
+    result = predict_file(args.input)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([result], columns=["file_id", "prediction"]).to_csv(
+        args.output, index=False
+    )
+    print(f"Wrote 1 prediction to {args.output}")
+    return 0
 
 
 def cmd_evaluate(args) -> int:
@@ -51,7 +61,7 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
-    # Same shim as Backend/Door/main.py:139 -- core/ and prediction/ import
-    # each other absolutely, so this directory must be on sys.path.
+    # Standalone CLI imports predictor.py from this subsystem directory. The
+    # shared API imports it as Rail_Corrugation.predictor instead.
     sys.path.insert(0, str(HERE))
     raise SystemExit(main())

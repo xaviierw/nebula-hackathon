@@ -1,13 +1,15 @@
-# Rail Corrugation subsystem dependencies.
-#
-# Split deliberately: the API installs only the INFERENCE tier (see
-# Backend/requirements.txt). Training dependencies must never become an API
-# dependency.
+# Exact inference environment encoded in model/rail_corrugation.joblib.
+# The saved scikit-learn estimator is version-sensitive, so deployments must
+# use these versions rather than merely installing a recent release.
 
-# --- INFERENCE (always required) ---
-pandas>=2.2
-numpy>=2.2
+# --- INFERENCE (shared API + CLI predict) -------------------------------
+numpy==2.3.3
+pandas==2.3.3
+scipy==1.16.2
+scikit-learn==1.7.2
+joblib==1.5.3
 
-# --- TRAINING (only needed to refit the model) ---
-# scikit-learn>=1.5
-# joblib>=1.4
+# --- TRAINING / EVALUATION ONLY -----------------------------------------
+# matplotlib>=3.9
+# seaborn>=0.13
+# jupyter>=1.1

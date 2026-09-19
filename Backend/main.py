@@ -1,4 +1,4 @@
-"""Nebula condition-monitoring API.
+r"""Nebula condition-monitoring API.
 
 Run from this directory:
 
@@ -38,8 +38,8 @@ async def lifespan(app: FastAPI):
         format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
     )
 
-    # Fails loudly and deliberately. Every route requires a verified token, so
-    # a server that cannot verify tokens is not partially useful.
+    # Fails loudly and deliberately. Every protected route requires a verified
+    # token, so a server that cannot verify tokens is not partially useful.
     init_firebase(settings)
 
     # Degrades per subsystem: one model missing must never take down the rest.

@@ -83,7 +83,9 @@ def build_subsystem_router(subsystem_id: str) -> APIRouter:
         items: list[BatchItem] = []
         for f in files:
             try:
-                payload, _ = await _predict_one(request, user, db, f, subsystem_id)
+                payload, _ = await _predict_one(
+                    request, user, db, f, subsystem_id, check_declared_size=False
+                )
                 items.append(BatchItem(filename=f.filename or "", ok=True, result=payload))
             except ApiError as exc:
                 items.append(
@@ -101,7 +103,15 @@ def build_subsystem_router(subsystem_id: str) -> APIRouter:
     return router
 
 
-async def _predict_one(request, user, db, file: UploadFile, subsystem_id: str):
+async def _predict_one(
+    request,
+    user,
+    db,
+    file: UploadFile,
+    subsystem_id: str,
+    *,
+    check_declared_size: bool = True,
+):
     runner = get_runner(subsystem_id)
     settings = get_settings()
 
@@ -115,8 +125,16 @@ async def _predict_one(request, user, db, file: UploadFile, subsystem_id: str):
         )
 
     # Reject oversized uploads before buffering them.
+    # Content-Length is the whole multipart body. It is a useful early reject
+    # for the one-file endpoint, but on /predict-batch it is the sum of every
+    # valid file and must not be compared with the per-file limit.
     declared = request.headers.get("content-length")
-    if declared and declared.isdigit() and int(declared) > settings.max_upload_bytes:
+    if (
+        check_declared_size
+        and declared
+        and declared.isdigit()
+        and int(declared) > settings.max_upload_bytes
+    ):
         raise PayloadTooLargeError(
             f"That file is too large. The limit is "
             f"{settings.max_upload_bytes // (1024 * 1024)} MB."
@@ -136,7 +154,11 @@ async def _predict_one(request, user, db, file: UploadFile, subsystem_id: str):
         digest = sha256_hex(raw)
         key = cache.cache_key(runner.id, runner.model_version, digest)
 
-        payload = cache.get(db, key) if settings.prediction_cache_enabled else None
+        payload = (
+            cache.get(db, key)
+            if settings.prediction_cache_enabled
+            else None
+        )
         cache_hit = payload is not None
         duration_ms = 0
 
