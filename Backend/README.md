@@ -27,6 +27,21 @@ cd Backend
 Interactive docs at <http://127.0.0.1:8000/api/docs>.
 Health, unauthenticated, at <http://127.0.0.1:8000/api/health>.
 
+### Local model/UI testing without Firebase
+
+Set this in the gitignored `Backend/.env`:
+
+```env
+LOCAL_DEV_MODE=true
+```
+
+Then run the same Uvicorn command above. Local mode accepts prediction requests
+without a bearer token and does not initialise Firebase or write cache, dataset
+metadata, users or run history. The `/api/auth/**` and `/api/users/**` routes
+are omitted. It is only for a server bound to `127.0.0.1`; never deploy or share
+a server with this setting enabled. Remove the line or set it to `false` before
+testing real authentication.
+
 The host and port are **not** configurable. `Frontend/vite.config.ts` proxies
 `/api` to `127.0.0.1:8000`, which is also why there is no CORS middleware —
 every request the browser makes is same-origin.
@@ -332,6 +347,7 @@ to `/login` every hour.
 | `FIREBASE_PROJECT_ID` | no | Same value as the frontend's |
 | `ALLOWED_EMAIL_DOMAINS` | no | Empty = anyone Firebase accepts |
 | `MAX_UPLOAD_BYTES` | no | Default 25 MiB |
+| `LOCAL_DEV_MODE` | no | `true` bypasses Firebase and persistence for local-only testing; default `false` |
 | `PREDICTION_CACHE_ENABLED` | no | `false` to benchmark cold runs |
 | `LOG_LEVEL` | no | |
 
@@ -374,6 +390,7 @@ Use `.env.local` specifically: the root `.gitignore` covers
 
 | Condition | Behaviour |
 |---|---|
+| `LOCAL_DEV_MODE=true` | Start without Firebase; prediction routes use a fixed local user and skip persistence |
 | Firebase credentials missing or bad | **Crash.** Every route needs auth; a server that cannot verify tokens is not partially useful |
 | Firestore unreachable | Not probed at startup; per-request 503 |
 | `door_model.json` missing | **Degrade.** Door → 503 with an actionable message; auth, history and the other subsystems still work |

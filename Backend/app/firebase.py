@@ -12,7 +12,7 @@ from functools import lru_cache
 import firebase_admin
 from firebase_admin import auth, credentials, firestore
 
-from .config import Settings
+from .config import Settings, get_settings
 
 log = logging.getLogger(__name__)
 
@@ -53,6 +53,8 @@ def init_firebase(settings: Settings) -> None:
 @lru_cache
 def get_db():
     """The Firestore client, from the initialised Admin app."""
+    if get_settings().local_dev_mode:
+        return None
     return firestore.client()
 
 

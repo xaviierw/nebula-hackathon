@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 26_214_400  # 25 MiB
 
     # --- Behaviour -------------------------------------------------------
+    # Local-only escape hatch for frontend/model development. This disables
+    # authentication and Firestore persistence, so it must never be enabled
+    # in a shared or deployed environment.
+    local_dev_mode: bool = False
     prediction_cache_enabled: bool = True
     log_level: str = "info"
 

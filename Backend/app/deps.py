@@ -43,6 +43,15 @@ def get_current_user(
     cold. FastAPI runs sync dependencies in a threadpool; an async version
     would stall the event loop on every request.
     """
+    if get_settings().local_dev_mode:
+        return CurrentUser(
+            uid="local-dev-user",
+            email="local@localhost",
+            name="Local developer",
+            picture=None,
+            email_verified=True,
+        )
+
     if cred is None or not cred.credentials:
         raise AuthError("Sign in to continue.")
 
