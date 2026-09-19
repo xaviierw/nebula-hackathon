@@ -1,24 +1,20 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { DemoDataBanner } from '../../features/door/components/DemoDataBanner'
 import { DoorIntro } from '../../features/door/components/DoorIntro'
 import { DoorResultsTable } from '../../features/door/components/DoorResultsTable'
 import { DoorSummary } from '../../features/door/components/DoorSummary'
 import { DoorWarnings } from '../../features/door/components/DoorWarnings'
 import { FileDropzone } from '../../features/door/components/FileDropzone'
-import { IS_PLACEHOLDER_DATA, runDoorPrediction } from '../../features/door/runPrediction'
+import { runDoorPrediction } from '../../features/door/runPrediction'
 import { SUBMISSION_FILENAME, downloadPredictionsCsv } from '../../features/door/toCsv'
 import type { DoorResult } from '../../features/door/types'
 
 /**
  * The Door subsystem page.
  *
- * Nothing here calls a backend. runDoorPrediction() is the single seam: today it
- * returns stored results after a short delay, and when the API lands only that
- * one file changes. The states below are real, though - a genuine loading phase,
- * a real error branch and a real empty branch - so that swapping the seam does
- * not then require building the states that a live call would immediately need.
+ * runDoorPrediction() sends the selected recording to the shared authenticated
+ * API. The page keeps loading, empty and readable backend-error states separate.
  */
 
 type Status = 'idle' | 'analyzing' | 'done' | 'error'
@@ -72,13 +68,22 @@ export function DoorPage() {
 
       {status === 'done' && result !== null && (
         <>
-          {IS_PLACEHOLDER_DATA && <DemoDataBanner />}
-
           {result.detail.length === 0 ? (
             <EmptyState />
           ) : (
             <>
               <DoorSummary detail={result.detail} />
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => downloadPredictionsCsv(result.detail)}
+                  className="rounded-md bg-sky-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
+                >
+                  ⭳ Download {SUBMISSION_FILENAME}
+                </button>
+              </div>
+
               <DoorWarnings warnings={result.warnings} />
               <DoorResultsTable detail={result.detail} />
 

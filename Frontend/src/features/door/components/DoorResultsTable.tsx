@@ -20,6 +20,10 @@ export function DoorResultsTable({ detail }: { detail: DoorDetailRow[] }) {
 
   return (
     <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <p className="border-b border-slate-200 px-5 py-3 text-xs leading-relaxed text-slate-600">
+        Bar shows the current measured through the middle of the stroke; the grey line marks
+        the healthy-door limit for that action.
+      </p>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[40rem] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50">

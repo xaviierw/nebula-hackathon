@@ -473,23 +473,18 @@ session restoration, bearer tokens and one forced-refresh retry on `401`.
 Configure the four `VITE_FIREBASE_*` values in `Frontend/.env.local` using
 `Frontend/.env.example`.
 
-Door still serves its fixture. To connect it, update
-`src/features/door/runPrediction.ts` using the implementation in its docstring
-and set `IS_PLACEHOLDER_DATA = false`.
-
-The results table, summary and CSV download should be identical to the
-fixture-driven version but with real numbers, and the demo banner disappears.
+Door is connected to `POST /api/door/predict`. The selected continuous stream
+is analysed by the deployed model, and the summary, warnings, result table and
+downloaded CSV all use that response.
 
 ---
 
 ## Known issues
 
-**`door_reference.json` does not exist**, so `warnings` is always `[]`. The
-guards that produce warnings short-circuit without it. Harmless and correct
-today — but when a retrain produces one, make sure the warning schema still
-passes extra keys through (`extra="allow"` in `app/schemas/common.py`). Pydantic's
-default would silently strip `n_segments`, `expected_min`, `observed` and the
-rest, and it would look like a model regression rather than a schema bug.
+Door's warning schema must continue allowing extra keys (`extra="allow"` in
+`app/schemas/common.py`). The deployed reference attaches fields such as
+`n_segments`, `expected_min` and `observed`; Pydantic's default would silently
+strip them and make a schema change look like a model regression.
 
 **`Door/output/door_detail.csv` is stale** — it predates `start_row`/`end_row`.
 The API never reads it. Don't "fix" it.

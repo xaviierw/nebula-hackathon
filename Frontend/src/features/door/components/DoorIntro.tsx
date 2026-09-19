@@ -25,10 +25,11 @@ export function DoorIntro() {
       </p>
 
       <p className="mt-3 text-sm leading-relaxed text-slate-600">
-        Upload a recording and this finds every open and close cycle inside it, then measures
-        the current through the <span className="font-medium text-slate-800">middle of each
-        stroke</span> — past the startup surge, before the braking — and compares it against
-        what a healthy door of that type needs.
+        Upload a recording — one continuous file covering many open and close cycles recorded
+        back-to-back, not split into one file per cycle — and this finds every cycle inside it,
+        then measures the current through the <span className="font-medium text-slate-800">middle
+        of each stroke</span> — past the startup surge, before the braking — and compares it
+        against what a healthy door of that type needs.
       </p>
 
       <p className="mt-4 border-t border-slate-100 pt-3 text-xs leading-relaxed text-slate-500">
