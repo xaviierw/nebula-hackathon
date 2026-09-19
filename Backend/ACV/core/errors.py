@@ -1,10 +1,4 @@
-"""Domain exceptions for the ACV subsystem.
-
-Modelled on Backend/Door/core/errors.py, and for the same reason: the
-prediction path must never raise SystemExit. SystemExit inherits from
-BaseException, so an embedding caller's `except Exception` misses it and the
-process dies instead of showing the message.
-"""
+"""Domain exceptions for the ACV subsystem."""
 
 from __future__ import annotations
 
@@ -15,12 +9,10 @@ class AcvError(Exception):
 
 class AcvInputError(AcvError):
     """The supplied file cannot be processed.
-
-    Wrong columns, no data rows, unparseable values. THE MESSAGE IS SHOWN TO
-    THE USER VERBATIM -- write it for a non-technical reader. Multi-line is
-    fine; the frontend renders it with whitespace-pre-line.
+    
+    Shown verbatim to the end user in the frontend.
     """
 
 
 class AcvModelError(AcvError):
-    """The trained model is missing or unusable."""
+    """The model config or parameters are missing or unusable."""

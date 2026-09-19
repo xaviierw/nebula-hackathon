@@ -1,0 +1,5 @@
+{
+  "ambient_quantile": 0.5,
+  "scoring_strategy": "borda_count",
+  "description": "Peer-relative shortfall + cooling delivered dual Borda ranking"
+}

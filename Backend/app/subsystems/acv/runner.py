@@ -1,37 +1,46 @@
-"""ACV runner -- NOT YET IMPLEMENTED.
-
-To wire up ACV:
-  1. Build Backend/ACV/ (see its README.md) so that
-     `prediction/predict.py` exposes a pure predict_file(frame, model, reference).
-  2. Fill in the class below, copying Backend/app/subsystems/door/runner.py --
-     it is the worked reference.
-  3. In app/subsystems/registry.py replace
-         register(NotImplementedRunner("acv", "ACV"))
-     with
-         register(AcvRunner())
-
-That is the entire API-side change. Do not add routes.
-
-NOTE ON IMPORTS: Door occupies the top-level module names `core`, `training`
-and `prediction` via its vendor_path shim. The second subsystem to be wired in
-CANNOT reuse those names -- give Backend/ACV a package root, or name its
-modules acv_core / acv_prediction. See Backend/README.md.
-"""
+"""API adapter for the ACV prediction pipeline."""
 
 from __future__ import annotations
 
-# from ...schemas.acv import AcvResult
-# from ..base import SubsystemRunner
-#
-#
-# class AcvRunner(SubsystemRunner):
-#     id = "acv"
-#     name = "ACV"
-#     upload_mode = "per-file"
-#     response_model = AcvResult
-#
-#     def load(self) -> None:
-#         ...
-#
-#     def run(self, raw: bytes, filename: str) -> dict:
-#         ...
+import hashlib
+import io
+from pathlib import Path
+
+from ACV.core.data import read_raw
+from ACV.core.model import AcvModel
+from ACV.prediction.predict import predict_file
+from ...schemas.acv import AcvResult
+from ..base import SubsystemRunner
+
+# Keep the API and `Backend/ACV/main.py predict` on the same model artifact.
+# The current training command writes the model to Backend/model.
+MODEL_PATH = Path(__file__).resolve().parents[3] / "model" / "acv_model.json"
+
+
+class AcvRunner(SubsystemRunner):
+   id = "acv"
+   name = "ACV"
+   upload_mode = "per-file"
+   response_model = AcvResult
+
+   def load(self) -> None:
+      if not MODEL_PATH.exists():
+         self.available = False
+         self.unavailable_reason = (
+            "The ACV model has not been built yet. "
+            "Run `python Backend/ACV/main.py train` first."
+         )
+         return
+
+      self._model = AcvModel.load(MODEL_PATH)
+      self.model_version = f"acv-1:{self._fingerprint()}"
+      self.available = True
+      self.unavailable_reason = None
+
+   def run(self, raw: bytes, filename: str) -> dict:
+      frame = read_raw(io.BytesIO(raw))
+      return predict_file(frame, self._model)
+
+   @staticmethod
+   def _fingerprint() -> str:
+      return hashlib.sha256(MODEL_PATH.read_bytes()).hexdigest()[:12]

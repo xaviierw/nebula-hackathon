@@ -1,22 +1,21 @@
-"""Fit the ACV model and write its artifacts.
-
-Run under WSL if scikit-learn binaries are blocked on this machine -- see
-Backend/Door/main.py:32-37 for the exact incantation.
-
-Everything written into ../model/ must be reproducible from this script. The
-API fingerprints those artifacts to version its prediction cache, so refitting
-automatically invalidates stale cached results.
-"""
+"""Fit the ACV model and write its artifacts."""
 
 from __future__ import annotations
 
 from pathlib import Path
-
-MODEL_DIR = Path(__file__).resolve().parents[1] / "model"
+from core.model import AcvModel, MODEL_PATH
 
 
 def main(argv=None) -> int:
-    raise NotImplementedError("ACV training not written yet")
+    print(f"Generating ACV heuristic model configuration at {MODEL_PATH}...")
+    model = AcvModel(config={
+        "ambient_quantile": 0.5,
+        "scoring_strategy": "borda_count",
+        "description": "Peer-relative shortfall + cooling delivered dual Borda ranking"
+    })
+    model.save(MODEL_PATH)
+    print("Model configuration written successfully.")
+    return 0
 
 
 if __name__ == "__main__":

@@ -1,26 +1,101 @@
-"""Feature extraction for ACV.
-
-Signal: Cabin/ambient temperature + control-mode telemetry.
-
-Keep this pure and deterministic -- the same file must always produce the same
-features, because the API caches results by file hash and will not re-run the
-model on a file it has already seen.
-"""
+"""Feature extraction for ACV telemetry."""
 
 from __future__ import annotations
 
+import re
+
 import pandas as pd
+import numpy as np
 
-# Column order the model was trained on. Training and prediction must agree,
-# so define it once here and import it in both.
-FEATURE_COLUMNS: list[str] = []
-
-
-def extract(frame: pd.DataFrame) -> dict:
-    """One file -> one feature dict."""
-    raise NotImplementedError("ACV feature extraction not written yet")
+COOLING_MODES = {"Automatic Cooling", "Full Cooling", "Half Cooling"}
 
 
-def build_table(frames: dict) -> pd.DataFrame:
-    """Many files -> a feature table, one row per file."""
-    raise NotImplementedError("ACV feature table not written yet")
+def calculate_train_ambient_ref(df: pd.DataFrame) -> pd.DataFrame:
+    """Calculates train-level ambient reference across populated end/car sensors."""
+    ambient_cols = [col for col in df.columns if '_ambient_temp' in col]
+    if ambient_cols:
+        df['train_ambient_ref'] = df[ambient_cols].median(axis=1)
+    else:
+        df['train_ambient_ref'] = np.nan
+    return df
+
+
+def _car_ids(df: pd.DataFrame) -> list[str]:
+    """Return identifiers discovered from normalized source headers."""
+    ids: list[str] = []
+    for column in df.columns:
+        match = re.match(r"^car_(.+?)_(?:ambient_temp|indoor_temp|cooling_setpoint|running_mode|valid_status)$", str(column))
+        if match and match.group(1) not in ids:
+            ids.append(match.group(1))
+    return ids
+
+
+def extract_features(df: pd.DataFrame, ambient_quantile: float = 0.5) -> dict:
+    """Extracts peer-relative shortfall and delivered cooling score vectors."""
+    car_ids = _car_ids(df)
+
+    # 1. Absolute shortfall (Indoor - Setpoint)
+    shortfall_cols = []
+    shortfall_ids = []
+    for car_id in car_ids:
+        indoor = f"car_{car_id}_indoor_temp"
+        setpoint = f"car_{car_id}_cooling_setpoint"
+        mode_col = f"car_{car_id}_running_mode"
+        valid_col = f"car_{car_id}_valid_status"
+        abs_shortfall = f"car_{car_id}_abs_shortfall"
+
+        if indoor in df.columns and setpoint in df.columns:
+            s = df[indoor] - df[setpoint]
+            if mode_col in df.columns:
+                s = s.where(df[mode_col].isin(COOLING_MODES))
+            if valid_col in df.columns:
+                s = s.where(df[valid_col] == "Valid")
+            df[abs_shortfall] = s
+            shortfall_cols.append(abs_shortfall)
+            shortfall_ids.append(car_id)
+
+    if not shortfall_cols:
+        return {"shortfall_scores": pd.Series(dtype=float), "delivered_scores": pd.Series(dtype=float)}
+
+    df['train_median_shortfall'] = df[shortfall_cols].median(axis=1)
+
+    rel_cols = []
+    for car_id in shortfall_ids:
+        abs_shortfall = f"car_{car_id}_abs_shortfall"
+        rel_shortfall = f"car_{car_id}_rel_shortfall"
+        if abs_shortfall in df.columns:
+            df[rel_shortfall] = df[abs_shortfall] - df['train_median_shortfall']
+            rel_cols.append(rel_shortfall)
+
+    # Filter by adaptive ambient threshold
+    ambient_threshold = df['train_ambient_ref'].quantile(ambient_quantile)
+    high_demand_mask = df['train_ambient_ref'] >= ambient_threshold
+    high_demand_df = df[high_demand_mask] if high_demand_mask.any() else df
+
+    shortfall_scores = high_demand_df[rel_cols].mean()
+    shortfall_scores.index = shortfall_ids
+
+    # Delivered cooling scores: ambient - indoor
+    delivered_cols = {}
+    for car_id in car_ids:
+        indoor = f"car_{car_id}_indoor_temp"
+        mode_col = f"car_{car_id}_running_mode"
+        valid_col = f"car_{car_id}_valid_status"
+        if indoor in df.columns:
+            s = df['train_ambient_ref'] - df[indoor]
+            if mode_col in df.columns:
+                s = s.where(df[mode_col].isin(COOLING_MODES))
+            if valid_col in df.columns:
+                s = s.where(df[valid_col] == "Valid")
+            delivered_cols[car_id] = s
+
+    wide_deliv = pd.DataFrame(delivered_cols)
+    wide_deliv_gated = wide_deliv[high_demand_mask] if high_demand_mask.any() else wide_deliv
+    train_median_deliv = wide_deliv_gated.median(axis=1)
+    deliv_residual = train_median_deliv.to_frame().to_numpy() - wide_deliv_gated.to_numpy()
+    delivered_scores = pd.DataFrame(deliv_residual, columns=wide_deliv_gated.columns).mean()
+
+    return {
+        "shortfall_scores": shortfall_scores,
+        "delivered_scores": delivered_scores,
+    }
