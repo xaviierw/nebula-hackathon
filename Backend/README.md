@@ -470,20 +470,14 @@ curl.exe -H "Authorization: Bearer $T" http://127.0.0.1:8000/api/users/me/runs
 
 ## Connecting the frontend
 
-The frontend still serves a fixture. Four changes, in order:
+Firebase authentication is connected in the frontend: email/password login,
+session restoration, bearer tokens and one forced-refresh retry on `401`.
+Configure the four `VITE_FIREBASE_*` values in `Frontend/.env.local` using
+`Frontend/.env.example`.
 
-1. `cd Frontend && npm i firebase`; add `.env.local`; create `src/firebase.ts`.
-2. Rewrite `src/auth/AuthProvider.tsx` onto `onAuthStateChanged`, **adding a
-   third loading state**. `RequireAuth.tsx` redirects whenever `isAuthed` is
-   false, but `onAuthStateChanged` resolves asynchronously — without a loading
-   state, every hard refresh bounces the user to `/login`. `AuthValue` needs
-   `isAuthed: boolean | null`, and `login` must become
-   `(email, password) => Promise<void>`.
-3. `src/api/client.ts:16` — attach the bearer token at the existing TODO; on a
-   401, retry once with `getIdToken(true)`.
-4. `src/features/door/runPrediction.ts` — paste the implementation already
-   written in its own docstring at lines 25–37, and set
-   `IS_PLACEHOLDER_DATA = false`.
+Door still serves its fixture. To connect it, update
+`src/features/door/runPrediction.ts` using the implementation in its docstring
+and set `IS_PLACEHOLDER_DATA = false`.
 
 The results table, summary and CSV download should be identical to the
 fixture-driven version but with real numbers, and the demo banner disappears.

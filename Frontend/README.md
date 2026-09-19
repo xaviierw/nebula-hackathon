@@ -14,6 +14,21 @@ npm run dev          # http://localhost:5173
 
 Other scripts: `npm run build`, `npm run preview`, `npm run lint` (oxlint).
 
+## Firebase authentication
+
+Copy `.env.example` to `.env.local`, then paste the public Web app values from
+Firebase Console → Project settings → General → Your apps:
+
+```powershell
+Copy-Item .env.example .env.local
+```
+
+The frontend uses Firebase email/password sign-in, restores sessions with
+`onAuthStateChanged`, opens `/api/auth/session` after login, and adds an ID
+token to every `apiFetch` request. A `401` forces one token refresh and one
+retry. The Admin service-account JSON belongs only in `Backend/.env`; never put
+it in the frontend.
+
 ## Rail Corrugation workflow
 
 Select one or more CSV recordings to create a results queue. The page calls
@@ -35,7 +50,8 @@ filename uniqueness, export formatting and report escaping.
 | `src/subsystems.ts` | The four subsystems, declared once |
 | `src/pages/subsystems/` | One page per subsystem — **build your subsystem here** |
 | `src/components/` | Shared UI (`AppShell`, `SubsystemCard`) |
-| `src/auth/` | Placeholder auth + the route guard |
+| `src/auth/` | Firebase auth state, email/password login + the route guard |
+| `src/firebase.ts` | Firebase Web app initialization |
 | `src/api/client.ts` | `apiFetch()` — the single place to call the backend |
 
 ## Adding your subsystem
@@ -47,8 +63,8 @@ name or blurb.
 
 ## Things to know
 
-- **Login accepts anything**, including an empty form. `src/auth/AuthProvider.tsx`
-  is the one file to change when real auth arrives.
+- **Firebase Web configuration is public**, but keep environment-specific
+  values in `.env.local`. Never expose the Admin SDK service-account JSON.
 - **Tailwind v4** — there is no `tailwind.config.js` and v4 does not use one.
   Do not run `npx tailwindcss init`; that is v3 muscle memory.
 - **Call the API with `apiFetch('/door/predict', ...)`**, not an absolute URL.
