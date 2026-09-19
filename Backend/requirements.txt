@@ -1,0 +1,27 @@
+# Nebula API dependencies. Python 3.11+.
+#
+#     .venv\Scripts\python.exe -m pip install -r Backend\requirements.txt
+#
+# This is the API tier only. Each subsystem keeps its own requirements.txt
+# split into INFERENCE and TRAINING blocks -- training dependencies must never
+# enter this file. See Backend/README.md.
+
+# --- API ----------------------------------------------------------------
+fastapi>=0.118
+uvicorn[standard]>=0.38
+python-multipart>=0.0.20
+pydantic>=2.12
+pydantic-settings>=2.8
+
+# --- Firebase / Firestore -----------------------------------------------
+# Pulls google-cloud-firestore, google-auth and grpcio transitively. Do not
+# pin google-cloud-firestore separately -- firebase-admin already constrains
+# it, and a second constraint only creates resolution conflicts.
+firebase-admin>=7.0
+
+# --- Inference tier (mirrors the INFERENCE block of Door/requirements.txt)
+pandas>=2.2
+numpy>=2.2
+
+# scikit-learn is deliberately absent. Training runs under WSL; the prediction
+# path this API calls is sklearn-free by design -- see Backend/Door/core/classifier.py.
