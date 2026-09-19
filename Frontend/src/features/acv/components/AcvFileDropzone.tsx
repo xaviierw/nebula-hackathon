@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 
+const MAX_ACV_FILE_BYTES = 25 * 1024 * 1024
+
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
@@ -24,6 +26,14 @@ export function AcvFileDropzone({ onFileSelected, selectedFile, disabled = false
       setRejection(`"${file.name}" is not a supported ACV file. Use CSV or Excel.`)
       return
     }
+    if (file.size === 0) {
+      setRejection(`"${file.name}" is empty.`)
+      return
+    }
+    if (file.size > MAX_ACV_FILE_BYTES) {
+      setRejection(`"${file.name}" exceeds the 25 MiB upload limit.`)
+      return
+    }
     setRejection(null)
     onFileSelected(file)
   }
@@ -45,7 +55,7 @@ export function AcvFileDropzone({ onFileSelected, selectedFile, disabled = false
         ].join(' ')}
       >
         <p className="text-sm font-medium text-slate-900">{isDraggingOver ? 'Drop to upload' : 'Drop an ACV export here'}</p>
-        <p className="mt-1 text-xs text-slate-500">or click to browse one CSV or Excel file</p>
+        <p className="mt-1 text-xs text-slate-500">or click to browse one CSV or Excel file · up to 25 MiB</p>
         <input ref={inputRef} type="file" accept=".csv,.xlsx,.xls,text/csv" className="sr-only" onChange={(event) => { accept(event.target.files?.[0]); event.target.value = '' }} />
       </button>
       {rejection !== null && <p role="alert" className="mt-3 text-sm text-red-700">{rejection}</p>}

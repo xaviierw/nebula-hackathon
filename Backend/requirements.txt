@@ -28,6 +28,10 @@ scipy==1.16.2
 scikit-learn==1.7.2
 joblib==1.5.3
 
+# ACV accepts both modern .xlsx and legacy .xls operational exports.
+openpyxl>=3.1,<4
+xlrd>=2.0,<3
+
 # --- Inference tier (also supplies Door's pandas/numpy requirements) -------
 -r SHM/requirements-inference.txt
 

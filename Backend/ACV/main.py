@@ -59,7 +59,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="ACV subsystem: Fault diagnosis / localisation.")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("train", help="Fit the model and write ./model artifacts")
+    sub.add_parser("train", help="Build the deterministic heuristic artifact")
 
     p = sub.add_parser("predict", help="Score a file and write a submission CSV")
     p.add_argument("--input", required=True, type=Path)

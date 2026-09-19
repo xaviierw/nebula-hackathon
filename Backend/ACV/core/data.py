@@ -5,31 +5,61 @@ from __future__ import annotations
 import io
 import re
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
-from .errors import AcvInputError
+from .errors import AcvInputError, AcvModelError
+
+SUPPORTED_SUFFIXES = {".csv", ".xlsx", ".xls"}
+CAR_COLUMN = re.compile(
+    r"^car_(.+?)_(ambient_temp|indoor_temp|cooling_setpoint|running_mode|valid_status)$"
+)
+REQUIRED_CAR_FIELDS = {
+    "indoor_temp",
+    "cooling_setpoint",
+    "running_mode",
+    "valid_status",
+}
 
 
-def read_raw(path: str | Path | io.BytesIO) -> pd.DataFrame:
+def read_raw(
+    source: str | Path | io.BytesIO,
+    filename: str | None = None,
+) -> pd.DataFrame:
     """Read an ACV file (Excel or CSV) from disk or memory."""
+    suffix = Path(source).suffix.lower() if isinstance(source, (str, Path)) else Path(filename or "").suffix.lower()
+    if suffix and suffix not in SUPPORTED_SUFFIXES:
+        raise AcvInputError("Use an ACV operational export in CSV, XLSX or XLS format.")
+
     try:
-        # Check if it's a file path string/Path
-        if isinstance(path, (str, Path)):
-            p = Path(path)
-            if p.suffix.lower() in [".xlsx", ".xls"]:
-                return pd.read_excel(p)
-            return pd.read_csv(p)
-        
-        # In-memory file-like object (e.g. from FastAPI UploadFile)
-        try:
-            return pd.read_excel(path)
-        except Exception:
-            if hasattr(path, "seek"):
-                path.seek(0)
-            return pd.read_csv(path)
-    except Exception as e:
-        raise AcvInputError(f"Could not read the uploaded file: {e}")
+        if suffix == ".xlsx":
+            return pd.read_excel(source, engine="openpyxl")
+        if suffix == ".xls":
+            return pd.read_excel(source, engine="xlrd")
+        if suffix == ".csv":
+            return pd.read_csv(source)
+
+        # Standalone callers may provide an unnamed byte stream. XLSX is a ZIP
+        # container and legacy XLS uses the OLE compound-file signature.
+        if hasattr(source, "read") and hasattr(source, "seek"):
+            signature = source.read(8)
+            source.seek(0)
+            if signature.startswith(b"PK"):
+                return pd.read_excel(source, engine="openpyxl")
+            if signature.startswith(bytes.fromhex("D0CF11E0")):
+                return pd.read_excel(source, engine="xlrd")
+        return pd.read_csv(source)
+    except ImportError as exc:
+        raise AcvModelError(
+            "ACV Excel support is not installed on the server. Reinstall Backend/requirements.txt."
+        ) from exc
+    except AcvInputError:
+        raise
+    except Exception as exc:
+        raise AcvInputError(
+            "Could not read the uploaded ACV file. Confirm that it is a valid, unencrypted CSV or Excel export."
+        ) from exc
 
 
 def standardize_column_names(df: pd.DataFrame) -> pd.DataFrame:
@@ -70,20 +100,45 @@ def sanitize_sensor_data(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def check_schema(frame: pd.DataFrame) -> None:
-    """Validates the schema, failing early and legibly."""
+    """Validate normalized ACV columns before calculating a ranking."""
     if frame.empty:
         raise AcvInputError("The uploaded file contains no data rows.")
-    
+
     if len(frame.columns) > 100:
         raise AcvInputError(
             f"Detected rich-telemetry format ({len(frame.columns)} columns). "
             "Please upload a standard 67-column ACV operational export."
         )
 
-    # Verify that at least one indoor temp column exists
-    indoor_cols = [c for c in frame.columns if "indoor" in str(c).lower()]
-    if not indoor_cols:
+    duplicates = frame.columns[frame.columns.duplicated()].tolist()
+    if duplicates:
         raise AcvInputError(
-            "Input file is missing required car indoor temperature columns.\n"
-            "Expected standard ACV telemetry with per-car readings."
+            "The ACV export contains duplicate sensor columns after normalization: "
+            + ", ".join(map(str, duplicates))
         )
+
+    fields_by_car: dict[str, set[str]] = {}
+    for column in frame.columns:
+        match = CAR_COLUMN.match(str(column))
+        if match:
+            fields_by_car.setdefault(match.group(1), set()).add(match.group(2))
+
+    if len(fields_by_car) < 2:
+        raise AcvInputError(
+            "The ACV export must contain telemetry for at least two cars."
+        )
+
+    if not any("ambient_temp" in fields for fields in fields_by_car.values()):
+        raise AcvInputError("The ACV export is missing outdoor temperature readings.")
+
+    incomplete = {
+        car_id: sorted(REQUIRED_CAR_FIELDS - fields)
+        for car_id, fields in fields_by_car.items()
+        if REQUIRED_CAR_FIELDS - fields
+    }
+    if incomplete:
+        details = "; ".join(
+            f"car {car_id}: {', '.join(fields)}"
+            for car_id, fields in sorted(incomplete.items())
+        )
+        raise AcvInputError(f"The ACV export is missing required telemetry ({details}).")

@@ -12,7 +12,7 @@ keep `ranked_cars` as the authoritative ordering.
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .common import Warning_
 
@@ -22,5 +22,5 @@ class AcvResult(BaseModel):
     # ranked_cars submission cell.
     ranked_cars: list[str]
     # Optional per-car score, for display. Shape is yours to choose.
-    scores: dict[str, float] = {}
-    warnings: list[Warning_] = []
+    scores: dict[str, float] = Field(default_factory=dict)
+    warnings: list[Warning_] = Field(default_factory=list)

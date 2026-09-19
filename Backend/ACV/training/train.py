@@ -1,4 +1,4 @@
-"""Fit the ACV model and write its artifacts."""
+"""Build the deterministic ACV heuristic configuration artifact."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from core.model import AcvModel, MODEL_PATH
 
 
 def main(argv=None) -> int:
-    print(f"Generating ACV heuristic model configuration at {MODEL_PATH}...")
+    print(f"Writing ACV heuristic configuration to {MODEL_PATH}...")
     model = AcvModel(config={
         "ambient_quantile": 0.5,
         "scoring_strategy": "borda_count",

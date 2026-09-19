@@ -7,6 +7,8 @@
 # --- INFERENCE (always required) ---
 pandas>=2.2
 numpy>=2.2
+openpyxl>=3.1,<4
+xlrd>=2.0,<3
 
 # --- TRAINING (only needed to refit the model) ---
 # scikit-learn>=1.5

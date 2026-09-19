@@ -7,6 +7,8 @@ import re
 import pandas as pd
 import numpy as np
 
+from .errors import AcvInputError
+
 COOLING_MODES = {"Automatic Cooling", "Full Cooling", "Half Cooling"}
 
 
@@ -55,7 +57,9 @@ def extract_features(df: pd.DataFrame, ambient_quantile: float = 0.5) -> dict:
             shortfall_ids.append(car_id)
 
     if not shortfall_cols:
-        return {"shortfall_scores": pd.Series(dtype=float), "delivered_scores": pd.Series(dtype=float)}
+        raise AcvInputError(
+            "The ACV export does not contain complete indoor and cooling-setpoint readings."
+        )
 
     df['train_median_shortfall'] = df[shortfall_cols].median(axis=1)
 
@@ -92,10 +96,21 @@ def extract_features(df: pd.DataFrame, ambient_quantile: float = 0.5) -> dict:
     wide_deliv = pd.DataFrame(delivered_cols)
     wide_deliv_gated = wide_deliv[high_demand_mask] if high_demand_mask.any() else wide_deliv
     train_median_deliv = wide_deliv_gated.median(axis=1)
-    deliv_residual = train_median_deliv.to_frame().to_numpy() - wide_deliv_gated.to_numpy()
-    delivered_scores = pd.DataFrame(deliv_residual, columns=wide_deliv_gated.columns).mean()
+    delivered_scores = wide_deliv_gated.rsub(train_median_deliv, axis=0).mean()
+
+    score_table = pd.concat(
+        [shortfall_scores.rename("shortfall"), delivered_scores.rename("delivered")],
+        axis=1,
+    )
+    unusable = score_table.index[~np.isfinite(score_table).all(axis=1)].tolist()
+    if unusable:
+        raise AcvInputError(
+            "There are no usable cooling observations for: "
+            + ", ".join(f"car {car_id}" for car_id in unusable)
+            + ". Check running mode, validity flags and temperature readings."
+        )
 
     return {
-        "shortfall_scores": shortfall_scores,
-        "delivered_scores": delivered_scores,
+        "shortfall_scores": score_table["shortfall"],
+        "delivered_scores": score_table["delivered"],
     }

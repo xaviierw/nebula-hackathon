@@ -1,130 +1,89 @@
 # ACV subsystem
 
-**Status: not built.** This directory is a skeleton. You own it.
+**Status: connected to the shared API.**
 
-Fault diagnosis / localisation -- identify the car with a refrigerant leak.
+ACV ranks every train car from most to least likely to have an air-conditioning
+fault. It uses cabin temperature, ambient temperature, cooling setpoint,
+running mode and validity telemetry.
 
-**Signal:** Cabin/ambient temperature + control-mode telemetry.
+The deployed artifact is a deterministic peer-relative heuristic rather than a
+fitted scikit-learn estimator. The original training recordings and ACV info kit
+are not committed, so this clone can reproduce inference but cannot independently
+reproduce or verify the model's hackathon score.
 
----
+## Accepted input
 
-## Before you write any code
+- Standard 67-column ACV operational exports.
+- CSV, XLSX or legacy XLS.
+- At least two cars with indoor temperature, cooling setpoint, running mode and
+  validity fields, plus outdoor temperature telemetry.
+- At least one usable cooling observation for every ranked car.
+- Maximum file size: 25 MiB.
 
-Read this subsystem Info Kit in `Backend/03_References/ACV/`. The problem
-statement (section 2.2) calls it *"the authoritative problem definition"* --
-the summary table is only a sketch, and the scoring metric you will be judged
-on is specified there in section 4, with a worked example.
-
-> **Blocker:** `Backend/02_Datasets/ACV/` and `Backend/03_References/ACV/`
-> do not exist in this repo yet. Only `Door/` is present. You need the original
-> hackathon material before you can start on features.
-
----
+The representative runtime example is
+`prediction/Test/acv_test_case.xlsx`.
 
 ## Submission format
 
-`acv_predictions.csv`
+`acv_predictions.csv` contains exactly:
 
-```
+```csv
 file_id,ranked_cars
 ```
 
-NOTE there is no `prediction` column. `ranked_cars` lists every car in the
-file from most- to least-likely faulty, using the car identifier EXACTLY as
-it appears in that file's own column headers (e.g. `03`, not `Car 3`),
-separated by a pipe `|`.
+There is no `prediction` column. `ranked_cars` lists every car from most to
+least likely faulty, preserves the identifier used in the source headers (for
+example `03`, not `Car 3`), and joins identifiers with `|`.
 
-Source: `Backend/01_Problem_Statement_3_Specifications.md` section 4.1.
+## Runtime design
 
----
-
-## What you need to deliver
-
-Fill in the skeleton:
-
-```
+```text
 ACV/
-  core/data.py             column constants, read_raw(), check_schema()
-  core/features.py         feature extraction
-  core/model.py            load + predict
-  core/errors.py           already written -- AcvInputError / AcvModelError
-  training/train.py        fits, selects, writes ./model artifacts
-  training/evaluate.py     scores against the info kit fixed metric
-  prediction/predict.py    <- THE ONE FILE THE API CALLS
+  core/data.py             reads and validates CSV/Excel telemetry
+  core/features.py         calculates peer-relative cooling metrics
+  core/model.py            combines the two rankings with Borda count
+  prediction/predict.py    pure DataFrame-to-result API seam
+  training/train.py        writes the deterministic configuration artifact
+  training/evaluate.py     reports top-ranked accuracy when training files exist
 ```
 
-### The only signature that is not yours to choose
+The shared adapter is `Backend/app/subsystems/acv/runner.py`. It inherits
+Firebase authentication, Firestore caching, upload limits, history and error
+mapping from the generated subsystem router. Its model version includes an
+explicit pipeline revision so feature changes invalidate cached predictions.
 
-```python
-# prediction/predict.py
+The success response is:
 
-def predict_file(frame: pd.DataFrame, model, reference: dict | None = None) -> dict:
-    ...
+```json
+{
+  "ranked_cars": ["03", "01", "02"],
+  "scores": {"03": 0.91, "01": 0.67, "02": 0.42},
+  "warnings": []
+}
 ```
 
-Returning, for this subsystem:
+Bad files raise `AcvInputError` with an end-user-readable message. Missing or
+invalid server artifacts raise `AcvModelError`. Uploaded bytes are processed in
+memory and are never persisted.
 
-```python
-{"ranked_cars": ["03", "01", "02"], "scores": {"03": 0.91}, "warnings": []}
-```
+## Commands
 
-Three rules, all learned the hard way on Door:
-
-1. **Raise, never `sys.exit`.** Use `AcvInputError` / `AcvModelError` from
-   `core/errors.py`. `SystemExit` inherits from `BaseException`, so a caller
-   `except Exception` misses it and the whole server dies instead of showing
-   the message.
-2. **`AcvInputError` messages are shown to users verbatim.** Write them for a
-   non-technical reader. Multi-line is fine.
-3. **Return plain `int` / `float` / `str`.** `np.int64` is not a subclass of
-   `int`, and the API response validation rejects it.
-
-Keep `predict_file` deterministic. The API caches results by file hash and
-will not re-run your model on a file it has already seen.
-
----
-
-## Wiring it into the API
-
-When `predict_file` works, it is a **two-file change** and you write no routes:
-
-1. Fill in `Backend/app/subsystems/acv/runner.py` -- copy
-   `Backend/app/subsystems/door/runner.py`, which is the worked reference.
-2. In `Backend/app/subsystems/registry.py`, replace
-
-   ```python
-   register(NotImplementedRunner("acv", "ACV"))
-   ```
-   with
-   ```python
-   register(AcvRunner())
-   ```
-
-Auth, the shared prediction cache, per-user history and error mapping all come
-for free. Confirm it worked:
+From `Backend/ACV`:
 
 ```bash
-curl.exe http://127.0.0.1:8000/api/health
-```
-
-Your subsystem should report `"available": true` with a real `model_version`.
-
-> **Import-name collision.** Door currently occupies the top-level module names
-> `core`, `training` and `prediction` via its `vendor_path.py` shim. The second
-> subsystem wired into the API **cannot** reuse those names. Give this
-> directory a package root, or rename its modules to `acv_core` /
-> `acv_prediction`, before you wire up. See `Backend/README.md`.
-
----
-
-## Running it standalone
-
-```bash
-cd Backend/ACV
 python main.py train
-python main.py predict --input <a test file>
+python main.py predict --input prediction/Test/acv_test_case.xlsx
 python main.py evaluate
 ```
 
-Artifacts go in `./model/`, predictions in `./output/`. Both are gitignored --
-everything in them must be reproducible from `training/train.py`.
+`train` rebuilds the deterministic JSON configuration. `evaluate` deliberately
+returns a non-zero status when the omitted training recordings are unavailable;
+it does not report a misleading `0/0` success.
+
+From `Backend`, run the shared API with:
+
+```bash
+../.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
+Then confirm `/api/health` reports ACV as available.

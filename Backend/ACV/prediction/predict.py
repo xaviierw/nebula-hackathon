@@ -28,12 +28,11 @@ def predict_file(frame: pd.DataFrame, model: AcvModel | None = None, reference: 
     Returns:
         {"ranked_cars": ["01", "03", ...], "scores": {"01": 0.94, ...}, "warnings": []}
     """
-    check_schema(frame)
-
     if model is None:
         model = AcvModel.load()
 
     df = standardize_column_names(frame.copy())
+    check_schema(df)
     df = sanitize_sensor_data(df)
     df = calculate_train_ambient_ref(df)
 

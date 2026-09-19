@@ -1,9 +1,9 @@
 # Nebula Frontend
 
 The single app that houses every subsystem model, as required by the hackathon
-brief (§4.1 item 3). Rail Corrugation and SHM are connected to the shared
-authenticated FastAPI backend. SHM downloads full-precision CSV predictions;
-see [SHM setup](../Backend/SHM/APP.md).
+brief (§4.1 item 3). ACV, Rail Corrugation and SHM are connected to the shared
+authenticated FastAPI backend. ACV and Rail produce submission-ready CSVs;
+SHM downloads full-precision predictions. See [SHM setup](../Backend/SHM/APP.md).
 
 ## Running it
 
