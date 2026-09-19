@@ -39,3 +39,9 @@ Backend/Door/output/*
 
 # Submission bundle - built from output/, never edited by hand
 predictions.zip
+
+# Frontend build artefacts, dependencies and local secrets
+Frontend/node_modules/
+Frontend/dist/
+Frontend/.vite/
+Frontend/.env*.local
