@@ -1,0 +1,1 @@
+"""Door subsystem: core package."""

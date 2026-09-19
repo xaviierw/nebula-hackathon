@@ -1,0 +1,48 @@
+# Door subsystem dependencies
+#
+# Requires Python 3.11 or newer.
+#
+# Install everything:
+#     pip install -r requirements.txt
+#
+# The dependencies fall into two tiers, and they are NOT both always needed:
+#
+#   INFERENCE  - predict.py, main.py predict/verify/evaluate/check
+#                Needs only pandas + numpy. This is what the app ships with.
+#
+#   TRAINING   - main.py train
+#                Additionally needs scikit-learn, used to benchmark the four
+#                candidate models and select between them. The trained model is
+#                exported to model/door_model.json as plain numbers, so nothing
+#                at prediction time ever imports scikit-learn.
+#
+# If you are only running predictions (or deploying the app), install just the
+# two packages in the INFERENCE block below -- it avoids ~150 MB of dependencies
+# and sidesteps the Windows Smart App Control issues that scikit-learn's
+# unsigned binaries can run into.
+
+
+# --- INFERENCE (always required) ---------------------------------------------
+pandas>=2.2
+numpy>=2.2
+
+
+# --- TRAINING (only needed to refit the model) -------------------------------
+scikit-learn>=1.5
+joblib>=1.4
+
+
+# Version notes
+# -------------
+# Lower bounds, not exact pins, because the pipeline was verified to produce
+# byte-identical model parameters, CV scores and predictions on two quite
+# different stacks:
+#
+#   Windows  Python 3.11.9  pandas 3.0.6  numpy 2.4.6  scikit-learn 1.5.2
+#   WSL      Python 3.12.3  pandas 2.2.3  numpy 2.2.6  scikit-learn 1.6.1
+#
+# Both pandas 2.x and 3.x work. scipy is not listed because it is installed
+# automatically as a scikit-learn dependency and is never imported directly.
+#
+# Optional, for linting during development only:
+#   pyflakes>=3.0
