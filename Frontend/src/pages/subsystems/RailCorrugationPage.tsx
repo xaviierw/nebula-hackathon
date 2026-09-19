@@ -7,7 +7,7 @@ import { RailResultsQueue } from '../../features/rail/components/RailResultsQueu
 import { runRailPredictionBatch } from '../../features/rail/runPrediction'
 import type { RailBatch, RailQueueEntry, RailReview } from '../../features/rail/types'
 import { useRailWorkspace } from '../../features/rail/useRailWorkspace'
-import { createEntries, MAX_RAIL_FILE_BYTES } from '../../features/rail/workspace'
+import { createClientId, createEntries, MAX_RAIL_FILE_BYTES } from '../../features/rail/workspace'
 
 export function RailCorrugationPage() {
   const { workspace, setWorkspace, storageError } = useRailWorkspace()
@@ -28,7 +28,7 @@ export function RailCorrugationPage() {
   }
 
   function newBatch(): RailBatch {
-    const created: RailBatch = { id: crypto.randomUUID(), createdAt: new Date().toISOString(), entries: [] }
+    const created: RailBatch = { id: createClientId(), createdAt: new Date().toISOString(), entries: [] }
     setWorkspace((current) => ({ ...current, batches: [created, ...current.batches] }))
     setBatchId(created.id)
     setSelectedId(null)

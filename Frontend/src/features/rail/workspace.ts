@@ -6,6 +6,22 @@ export const STORAGE_KEY = 'nebula.rail.workspace.v1'
 export const MAX_RAIL_FILE_BYTES = 25 * 1024 * 1024
 export const emptyWorkspace = (): RailWorkspace => ({ version: 1, batches: [] })
 
+/**
+ * randomUUID is unavailable when a demo is served over plain HTTP by IP.
+ * getRandomValues remains available in those browsers, and the final fallback
+ * is sufficient for identifiers that only distinguish local UI records.
+ */
+export function createClientId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
+  }
+  if (typeof globalThis.crypto?.getRandomValues === 'function') {
+    const values = globalThis.crypto.getRandomValues(new Uint32Array(4))
+    return `${Date.now().toString(36)}-${Array.from(values, (value) => value.toString(36)).join('-')}`
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`
+}
+
 function isDate(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value))
 }
@@ -67,7 +83,7 @@ export function createEntries(files: File[], existing: RailQueueEntry[] = []): R
       ? 'Expected a sensor recording in CSV format.'
       : file.size > MAX_RAIL_FILE_BYTES ? 'The file exceeds the 25 MiB upload limit.' : null
     return {
-      id: crypto.randomUUID(), fileName: file.name, size: file.size,
+      id: createClientId(), fileName: file.name, size: file.size,
       status: error ? 'error' : 'queued', error, analysis: null, analysedAt: null,
       excluded: false, review: emptyReview(),
     }
