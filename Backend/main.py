@@ -1,4 +1,4 @@
-"""Nebula condition-monitoring API.
+r"""Nebula condition-monitoring API.
 
 Run from this directory:
 

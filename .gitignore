@@ -81,3 +81,8 @@ Backend/**/__pycache__/
 # reproducible from a clone).
 !Backend/Door/model/door_model.json
 !Backend/Door/model/door_reference.json
+
+# Rail's fitted Extra Trees bundle is also required for a fresh deployment.
+# It is validated against its feature contract and exact inference versions
+# at startup; training data remains ignored.
+!Backend/Rail_Corrugation/model/rail_corrugation.joblib

@@ -1,8 +1,8 @@
 # Nebula Frontend
 
 The single app that houses every subsystem model, as required by the hackathon
-brief (§4.1 item 3). This is currently a **navigation skeleton only** — no
-uploads, no predictions, no backend calls.
+brief (§4.1 item 3). The Rail Corrugation page is connected to the shared
+FastAPI backend; the other pages are integrated independently.
 
 ## Running it
 
@@ -13,6 +13,19 @@ npm run dev          # http://localhost:5173
 ```
 
 Other scripts: `npm run build`, `npm run preview`, `npm run lint` (oxlint).
+
+## Rail Corrugation workflow
+
+Select one or more CSV recordings to create a results queue. The page calls
+`POST /api/rail-corrugation/predict-batch`, keeps per-file failures retryable,
+and shows the finding, measured evidence, plain-language definitions, review
+checklist and review record for each successful item.
+
+Saved batches and reviews persist in browser localStorage under
+`nebula.rail.workspace.v1`; raw recordings are never stored there. Users can
+download an individual printable HTML review report or the required two-column
+`rail_predictions.csv`. Run `npm run test:rail` to check workspace restoration,
+filename uniqueness, export formatting and report escaping.
 
 ## Where things live
 
