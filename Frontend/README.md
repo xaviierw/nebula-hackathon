@@ -1,17 +1,15 @@
 # Nebula Frontend
 
 The single app that houses every subsystem model, as required by the hackathon
-brief (§4.1 item 3). The Rail Corrugation page is connected to the shared
-FastAPI backend; the other pages are integrated independently.
-
-brief). SHM uploads recordings to the shared authenticated API and downloads
-full-precision CSV predictions. See [SHM setup](../Backend/SHM/APP.md).
+brief (§4.1 item 3). Rail Corrugation and SHM are connected to the shared
+authenticated FastAPI backend. SHM downloads full-precision CSV predictions;
+see [SHM setup](../Backend/SHM/APP.md).
 
 ## Running it
 
 ```bash
 cd Frontend
-npm install
+npm ci               # Node 20.19+ or 22.12+
 npm run dev          # http://localhost:5173
 ```
 

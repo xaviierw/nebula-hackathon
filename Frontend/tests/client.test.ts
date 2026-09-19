@@ -3,13 +3,14 @@ const { user, auth, signOut } = vi.hoisted(() => {
   const user = { getIdToken: vi.fn() }
   return { user, auth: { currentUser: user as typeof user | null, authStateReady: vi.fn() }, signOut: vi.fn() }
 })
-vi.mock('../src/auth/firebase', () => ({ firebaseAuth: auth }))
+vi.mock('../src/firebase', () => ({ firebaseAuth: auth }))
 vi.mock('firebase/auth', () => ({ signOut }))
 import { apiFetch } from '../src/api/client'
 
 beforeEach(() => {
   auth.currentUser = user
   user.getIdToken.mockReset().mockResolvedValue('test-only-token')
+  signOut.mockReset().mockResolvedValue(undefined)
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}')))
 })
 it('attaches the token and preserves caller headers and body', async () => {

@@ -1,4 +1,6 @@
 numpy>=2.2
 pandas>=2.2
-scipy==1.15.3
+# The shared API pins 1.16.2 for Rail; SHM only uses scipy.special.logsumexp
+# and supports both its training version and the shared inference version.
+scipy>=1.15.3,<1.17
 rainflow==3.2.0

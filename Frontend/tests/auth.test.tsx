@@ -2,7 +2,11 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 const { state, api } = vi.hoisted(() => ({ state: { callback: undefined as ((user: unknown) => Promise<void>) | undefined }, api: vi.fn() }))
-vi.mock('../src/auth/firebase', () => ({ firebaseAuth: {}, authConfigurationError: '' }))
+vi.mock('../src/firebase', () => ({
+  firebaseAuth: {},
+  firebaseConfigurationError: null,
+  requireFirebaseAuth: vi.fn(),
+}))
 vi.mock('../src/api/client', () => ({ apiFetch: api }))
 vi.mock('firebase/auth', () => ({
   onAuthStateChanged: vi.fn((_auth, callback) => { state.callback = callback; return () => {} }),
@@ -11,7 +15,7 @@ vi.mock('firebase/auth', () => ({
 import { AuthProvider } from '../src/auth/AuthProvider'
 import { RequireAuth } from '../src/auth/RequireAuth'
 import { useAuth } from '../src/auth/useAuth'
-function Login() { return <p>Login: {useAuth().error}</p> }
+function Login() { return <p>Login: {useAuth().authenticationError}</p> }
 function mount() {
   render(<AuthProvider><MemoryRouter initialEntries={['/private']}><Routes>
     <Route element={<RequireAuth />}><Route path="/private" element={<p>Private page</p>} /></Route>
@@ -23,7 +27,7 @@ it('waits for restored Firebase state and shared session validation before rende
   let resolve!: (response: Response) => void
   api.mockReturnValue(new Promise(done => { resolve = done }))
   mount()
-  expect(screen.getByRole('status').textContent).toContain('Restoring')
+  expect(screen.getByRole('status').textContent).toContain('Checking')
   expect(screen.queryByText(/Login:/)).toBeNull()
   let completion!: Promise<void>
   act(() => { completion = state.callback!({ uid: 'test' }) })

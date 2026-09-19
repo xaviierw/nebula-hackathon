@@ -6,6 +6,7 @@ export interface AuthValue {
   isLoading: boolean
   user: User | null
   configurationError: string | null
+  authenticationError: string | null
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }

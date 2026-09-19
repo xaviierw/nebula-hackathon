@@ -3,8 +3,8 @@
 FastAPI service behind the React frontend. One API, four condition-monitoring
 subsystems, Firebase Auth for sign-in and Firestore for history.
 
-**Status:** scaffold complete. Door and Rail Corrugation are wired into the
-shared API. ACV and SHM remain skeletons returning HTTP 501.
+**Status:** Door, Rail Corrugation and SHM are wired into the shared API. ACV
+remains a skeleton returning HTTP 501.
 
 ---
 
@@ -89,12 +89,13 @@ submission CSV needs many files in one pass.
 Ids match `SubsystemId` in `Frontend/src/subsystems.ts` exactly, hyphen and all.
 They are the URL slug on both sides.
 
-### ⚠️ Two subsystems are blocked on data
+### ACV is blocked on data
 
-`02_Datasets/` and `03_References/` contain **only `Door/`**. There are no
-datasets and no info kits for ACV or SHM in this repo. Rail's fitted inference
-bundle and analysis notebook are committed under `Rail_Corrugation/`; its large
-source recordings remain intentionally ignored.
+`02_Datasets/` and `03_References/` contain **only `Door/`**. There is no ACV
+dataset or info kit in this repo. Rail's fitted inference bundle and analysis
+notebook are committed under `Rail_Corrugation/`; its large source recordings
+remain intentionally ignored. SHM's portable inference artifact is committed
+under `SHM/artifacts/` and does not require its training data at runtime.
 
 The problem statement calls each info kit *"the authoritative problem
 definition"* and says to read it before starting. Whoever owns each subsystem

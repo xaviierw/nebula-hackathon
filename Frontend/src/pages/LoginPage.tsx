@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/useAuth'
 
 export function LoginPage() {
-  const { configurationError, isAuthed, isLoading, login } = useAuth()
+  const { authenticationError, configurationError, isAuthed, isLoading, login } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -46,6 +46,11 @@ export function LoginPage() {
           {error && (
             <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
               {error}
+            </p>
+          )}
+          {!error && authenticationError && (
+            <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+              {authenticationError}
             </p>
           )}
 

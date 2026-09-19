@@ -3,7 +3,6 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebas
 import type { User } from 'firebase/auth'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 
 import { apiFetch } from '../api/client'
 import {
@@ -17,23 +16,43 @@ import type { AuthValue } from './auth-context'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(firebaseAuth !== null)
+  const [authenticationError, setAuthenticationError] = useState<string | null>(null)
   const loginInProgress = useRef(false)
 
   useEffect(() => {
     if (firebaseAuth === null) return
-    return onAuthStateChanged(firebaseAuth, (nextUser) => {
+    let generation = 0
+    return onAuthStateChanged(firebaseAuth, async (nextUser) => {
       // signInWithEmailAndPassword updates Firebase state before the backend
       // has accepted /auth/session. Let login() finish that handshake first,
       // otherwise the route guard can briefly admit a rejected account.
       if (loginInProgress.current) return
-      setUser(nextUser)
-      setIsLoading(false)
+      const current = ++generation
+      setUser(null)
+      setAuthenticationError(null)
+      setIsLoading(true)
+      try {
+        if (nextUser) {
+          const response = await apiFetch('/auth/session', { method: 'POST' })
+          if (!response.ok) {
+            throw new Error(await problemMessage(response, 'Sign-in could not be verified.'))
+          }
+        }
+        if (current === generation) setUser(nextUser)
+      } catch (error) {
+        if (current === generation) {
+          setAuthenticationError(error instanceof Error ? error.message : 'Cannot reach the sign-in service.')
+        }
+      } finally {
+        if (current === generation) setIsLoading(false)
+      }
     })
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
     const auth = requireFirebaseAuth()
     loginInProgress.current = true
+    setAuthenticationError(null)
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password)
       const response = await apiFetch('/auth/session', { method: 'POST' })
@@ -45,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       if (auth.currentUser) await signOut(auth).catch(() => undefined)
       setUser(null)
+      setAuthenticationError(error instanceof Error ? error.message : 'Sign-in failed. Please try again.')
       if (error instanceof FirebaseError) throw new Error(firebaseMessage(error))
       throw error
     } finally {
@@ -63,9 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     user,
     configurationError: firebaseConfigurationError,
+    authenticationError,
     login,
     logout,
-  }), [isLoading, login, logout, user])
+  }), [authenticationError, isLoading, login, logout, user])
 
   return <AuthContext value={value}>{children}</AuthContext>
 }
