@@ -18,23 +18,17 @@ __pycache__/
 Thumbs.db
 desktop.ini
 
-# Generated artefacts - keep the folders, ignore everything produced into them.
+# Generated artefacts - keep the folder, ignore everything produced into it.
 # Git cannot track an empty directory, so a .gitkeep placeholder is committed
-# in each and re-included by the negations below.
+# and re-included by the negation below.
 #
-# Nothing in either folder is versioned. Everything there is reproducible:
-#   model/   `python main.py train`    -> door_model.json, door_reference.json,
-#                                         door_model.joblib, training_report.json
 #   output/  `python main.py predict`  -> door_predictions.csv, door_detail.csv
 #
-# NOTE: `train` also needs Backend/02_Datasets/Door/Train.csv, which is ignored
-# (provided hackathon material). A fresh clone therefore has the code but not
-# the data, so it must obtain the dataset before it can regenerate the model,
-# and predict.py will not run until it has. That is deliberate - generated data
-# stays out of git - but it means the repo is not self-contained.
-Backend/Door/model/*
+# model/ is now versioned deliberately: door_model.json, door_reference.json,
+# door_model.joblib and training_report.json are the artefacts deployed at the
+# final stage, so the trained model ships with the repo rather than being
+# regenerated on every clone.
 Backend/Door/output/*
-!Backend/Door/model/.gitkeep
 !Backend/Door/output/.gitkeep
 
 # Submission bundle - built from output/, never edited by hand
