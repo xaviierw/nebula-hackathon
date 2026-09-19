@@ -1,8 +1,8 @@
 # Nebula Frontend
 
 The single app that houses every subsystem model, as required by the hackathon
-brief (§4.1 item 3). This is currently a **navigation skeleton only** — no
-uploads, no predictions, no backend calls.
+brief (§4.1 item 3). The Rail Corrugation page is connected to its FastAPI
+prediction endpoint; other subsystem pages are being integrated independently.
 
 ## Running it
 
@@ -12,7 +12,35 @@ npm install
 npm run dev          # http://localhost:5173
 ```
 
+For live Rail Corrugation predictions, also start its FastAPI service by
+following `Backend/Rail_Corrugation/README.md`. The Vite development server
+proxies `/api` to that service on port 8000.
+
 Other scripts: `npm run build`, `npm run preview`, `npm run lint` (oxlint).
+
+## Rail Corrugation workflow
+
+Select one or more CSV recordings to create a results queue. Each recording is
+analysed separately and exposes the finding, measured evidence, explanatory terms,
+review checklist and editable review record. Use the queue filters to find flagged,
+failed or unreviewed recordings. Failed files can be retried or reselected after a
+reload. Duplicate filenames within a batch are rejected; use New batch to analyse
+another recording with the same name.
+
+Saved batches and reviews persist in localStorage under `nebula.rail.workspace.v1`
+on the same browser/device/origin. Raw recordings are not saved. This is local
+persistence for the demo, not a shared team database; download reports before
+clearing browser data. Storage failures and conflicting changes from another tab
+are shown in the page.
+
+Download an individual HTML review report (standalone, printable to PDF) or the
+batch's `rail_predictions.csv`. Combined export includes every successful,
+non-excluded recording in upload order, regardless of the queue filter. It is
+disabled while files remain unresolved; exclusions produce an explicitly labelled
+partial export. Review fields never enter the submission CSV.
+
+Run `npm run test:rail` with Node 24 to check saved-record restoration, interrupted
+queues, filename uniqueness, CSV formatting and report escaping.
 
 ## Where things live
 

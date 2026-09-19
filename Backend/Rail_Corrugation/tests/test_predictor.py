@@ -104,7 +104,50 @@ class PredictorTests(unittest.TestCase):
         with patch.object(predictor.joblib, "load", wraps=joblib.load) as load:
             predictor.predict_file(self.first)
             predictor.predict_files([self.second, self.first])
-            self.assertEqual(load.call_count, 1)
+        self.assertEqual(load.call_count, 1)
+
+    def test_analysis_evidence_matches_notebook_and_preserves_submission(self):
+        for path in [self.first, self.second]:
+            with self.subTest(file=path.name):
+                reference = self.reference["extract_features"](path)
+                with patch.object(predictor, "read_recording", wraps=predictor.read_recording) as read:
+                    analysis = predictor.analyse_file(path)
+                    self.assertEqual(read.call_count, 1)
+                self.assertEqual(
+                    {key: analysis[key] for key in ("file_id", "prediction")},
+                    predictor.predict_file(path),
+                )
+                evidence = analysis["evidence"]
+                self.assertEqual(evidence["samples_per_sensor"], 10_000)
+                self.assertEqual(evidence["column_count"], 129)
+                self.assertEqual(evidence["duration_seconds"], 1.0)
+                self.assertEqual(evidence["vibration_sensors_per_side"], 32)
+                self.assertEqual(evidence["feature_count"], 15)
+                for side in ["side_i", "side_ii"]:
+                    for metric in ["rms_median", "rms_max", "abs_peak_max"]:
+                        self.assertEqual(evidence[side][metric], reference[f"vibration__{side}__{metric}"])
+                # Evidence must be JSON-safe, while submission helpers stay two-column.
+                json.dumps(analysis, allow_nan=False)
+                self.assertEqual(predictor.predict_files([path]).columns.tolist(), ["file_id", "prediction"])
+
+    def test_analysis_measurements_follow_the_actual_side_and_handle_zero_signals(self):
+        first = predictor.analyse_file(self.first)["evidence"]
+        second = predictor.analyse_file(self.second)["evidence"]
+        for metric in ["rms_median", "rms_max", "abs_peak_max"]:
+            self.assertAlmostEqual(second["side_i"][metric], first["side_i"][metric] * 4)
+            self.assertEqual(second["side_ii"][metric], first["side_ii"][metric])
+        frame = pd.DataFrame(np.zeros((10_000, 129), dtype=np.float32), columns=predictor.EXPECTED_HEADER)
+        with patch.object(predictor, "read_recording", return_value=frame):
+            analysis = predictor.analyse_file(self.first)
+        for side in ["side_i", "side_ii"]:
+            self.assertTrue(all(value == 0.0 for value in analysis["evidence"][side].values()))
+        json.dumps(analysis, allow_nan=False)
+
+    def test_analysis_rejects_invalid_input_instead_of_producing_evidence(self):
+        path = self.root / "invalid_analysis.csv"
+        path.write_text("wrong,header\n1,2\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            predictor.analyse_file(path)
 
     def test_replacing_model_at_same_path_refreshes_cache(self):
         path = self.root / "replaceable.joblib"

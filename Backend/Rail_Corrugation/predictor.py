@@ -2,6 +2,7 @@
 
 predict_file(path) returns {"file_id": ..., "prediction": ...}.
 predict_files(paths) returns a DataFrame with those two columns, in input order.
+analyse_file(path) adds measured evidence for the app without changing CSV exports.
 The default model is resolved relative to this file and is cached between calls.
 Only pass trusted, application-controlled paths for model_path.
 """
@@ -239,9 +240,13 @@ def predict_files(
     bundle = load_rail_model(model_path)
     # Each raw file is processed separately; only its 15-feature summary is kept.
     rows = [extract_features(path) for path in paths]
-    measurements = pd.DataFrame(rows).loc[:, bundle["feature_columns"]]
-    predictions = bundle["model"].predict(measurements)
+    predictions = _predict_feature_rows(rows, bundle)
     return pd.DataFrame({"file_id": names, "prediction": predictions})
+
+
+def _predict_feature_rows(rows: list[dict[str, float]], bundle: dict) -> np.ndarray:
+    measurements = pd.DataFrame(rows).loc[:, bundle["feature_columns"]]
+    return bundle["model"].predict(measurements)
 
 
 def predict_file(
@@ -249,3 +254,34 @@ def predict_file(
 ) -> dict[str, str]:
     """Return one recording's filename and Normal, Side I, or Side II prediction."""
     return predict_files([file_path], model_path).iloc[0].to_dict()
+
+
+def analyse_file(
+    file_path: str | Path, model_path: str | Path = DEFAULT_MODEL_PATH,
+) -> dict:
+    """Predict once and expose selected inputs, not feature attribution or severity.
+
+    Evidence is taken from the same feature row passed to the classifier. Recording
+    metadata describes the schema checked by read_recording; it is not a sensor
+    health assessment. The original two-column prediction helpers stay unchanged.
+    """
+    path = _recording_path(file_path)
+    bundle = load_rail_model(model_path)
+    features = extract_features(path)
+    prediction = str(_predict_feature_rows([features], bundle)[0])
+    displayed_metrics = ("rms_median", "rms_max", "abs_peak_max")
+    evidence = {
+        "samples_per_sensor": SAMPLES_PER_FILE,
+        "column_count": len(EXPECTED_HEADER),
+        "duration_seconds": SAMPLES_PER_FILE / FEATURE_CONTRACT["sampling_rate_hz"],
+        "vibration_sensors_per_side": len(VIBRATION_COLUMNS["side_i"]),
+        "feature_count": len(FEATURE_COLUMNS),
+        **{
+            side: {
+                metric: features[f"vibration__{side}__{metric}"]
+                for metric in displayed_metrics
+            }
+            for side in SIDE_POSITIONS
+        },
+    }
+    return {"file_id": path.name, "prediction": prediction, "evidence": evidence}
