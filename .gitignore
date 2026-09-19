@@ -45,3 +45,10 @@ Frontend/node_modules/
 Frontend/dist/
 Frontend/.vite/
 Frontend/.env*.local
+
+# SHM: commit source and artifacts/model.json, not datasets or experiment output.
+Backend/SHM/dataset_shm/
+Backend/SHM/.cache/
+Backend/SHM/outputs/
+Backend/SHM/shm_predictions.csv
+.pytest_cache/

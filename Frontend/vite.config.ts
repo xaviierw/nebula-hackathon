@@ -7,13 +7,16 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Tailwind is handled by its Vite plugin; do not inherit unrelated configs
+  // from a developer's parent directories.
+  css: { postcss: { plugins: [] } },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
-    // The API does not exist yet. Every request the app makes is a relative
+    // Every request the app makes is a relative
     // /api/... path, so it is same-origin in dev (via this proxy) and in
     // production (via a host-level rewrite). CORS therefore never applies.
     proxy: {

@@ -1,9 +1,8 @@
 /**
  * The single place the app talks to the backend.
  *
- * Nothing calls this yet - the API does not exist. It is here so that when the
- * first subsystem page needs it, there is one place to add auth headers and
- * error handling rather than four scattered `fetch` calls.
+ * SHM uses this client for live predictions. Subsystems share this seam for
+ * future auth headers and service configuration.
  *
  * The path is always relative, which keeps requests same-origin in dev (Vite
  * proxies /api to the local service) and in production (the host rewrites
