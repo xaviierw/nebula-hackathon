@@ -52,3 +52,39 @@ Backend/SHM/.cache/
 Backend/SHM/outputs/
 Backend/SHM/shm_predictions.csv
 .pytest_cache/
+
+# --- Backend API ---------------------------------------------------------
+# The service account JSON itself must live outside the repo; these are
+# belt-and-braces in case someone drops one in anyway.
+Backend/.env
+Backend/.env.*
+!Backend/.env.example
+*-firebase-adminsdk-*.json
+serviceAccountKey.json
+
+# Frontend/.env*.local is covered above, but a plain .env is not.
+Frontend/.env
+
+# Generated artefacts for the new subsystems, matching Door's rules above.
+Backend/ACV/model/*
+Backend/ACV/output/*
+!Backend/ACV/model/.gitkeep
+!Backend/ACV/output/.gitkeep
+Backend/Rail_Corrugation/model/*
+Backend/Rail_Corrugation/output/*
+!Backend/Rail_Corrugation/model/.gitkeep
+!Backend/Rail_Corrugation/output/.gitkeep
+Backend/SHM/model/*
+Backend/SHM/output/*
+!Backend/SHM/model/.gitkeep
+!Backend/SHM/output/.gitkeep
+
+# Python bytecode from the API tier.
+Backend/**/__pycache__/
+
+# The Door INFERENCE artefacts are committable: door_model.json is ~400 bytes
+# of plain numbers with no training data in it, and without it a fresh clone
+# has a dead Door endpoint (Train.csv is gitignored, so model/ is NOT in fact
+# reproducible from a clone).
+!Backend/Door/model/door_model.json
+!Backend/Door/model/door_reference.json

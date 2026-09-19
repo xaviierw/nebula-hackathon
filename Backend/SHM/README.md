@@ -145,48 +145,96 @@ All current default reports live in `outputs/grouped/` (ignored by Git). The
 earlier random-file results under `outputs/` are retained as historical sensitivity
 results; they preceded the full waveform dependence check.
 
-| Path | Contents |
-|---|---|
-| `audit/audit.json` | Input checks, units/independence limitations, counts |
-| `audit/features.csv` | All per-file raw and rainflow summaries, moments, labels |
-| `audit/overlaps.csv` | Exact overlap evidence with positions |
-| `audit/nearest_neighbors.csv` | Candidates for waveform/provenance review |
-| `audit/waveform_similarity_checks.csv` | Coarse lag correlations for six nearest summary pairs; not inferred sessions |
-| `audit/correlated_waveforms.csv` | All screened pairs with full-resolution and blockwise correlation evidence |
-| `development/` | All candidate OOF results, fit parameters, saved splits |
-| `final/balanced/` | Nested evaluation of the complete selection procedure |
-| `final/unbalanced_sensitivity/` | Separate nested sensitivity run |
-| `final/model.json` | Portable final model, versions and protocol fingerprint |
-| `final/shm_predictions.csv` | Exactly 16 positive finite test predictions |
-| `final/test_support_flags.csv` | Test summaries outside training min/max |
+## Submission format
 
-Each validation report includes pooled MAPE, score, per-file/repeat/fold errors,
-target-quartile errors, worst files, residual correlations by repeat, and
-conditional bootstrap sensitivity intervals. Development includes paired
-file-level differences versus the weighted-median baseline. Nested reports also
-include inner candidate scores, selected parameter values and family frequencies.
+`shm_predictions.csv`
 
-Primary MAPE averages absolute percentage errors over file-repeat appearances;
-each file contributes equally. Fold scores are not clipped before pooling. The
-MAPE of averaged repeated OOF predictions is explicitly a separate diagnostic.
-There remain 64 files, not 320 independent observations. Bootstrap intervals
-resample file/group identities, keeping repeats together; they are conditional
-on the existing OOF predictions and omit refitting uncertainty. Repeat SD is
-split sensitivity, not a standard error.
-
-Residual correlations are exploratory. New seeds or rerunning CV cannot erase
-label reuse when residuals inspire new features. Frozen nested selection is a
-practical internal evaluation, not an untouched external test. Material units,
-sampling frequency, original acquisition groups, organiser corrections, and the
-previous modelling implementation remain unverified. No historical bug is inferred.
-
-## Inference without labels
-
-```powershell
-.venv/Scripts/python.exe Backend/SHM/predict.py --model Backend/SHM/outputs/grouped/final/model.json --input Backend/SHM/dataset_shm/SHM/Test --output Backend/SHM/shm_predictions.csv
+```
+file_id,prediction
 ```
 
-Inference requires only the saved JSON model, code/dependencies and input signal
-files. It never reads training labels. It uses the same feature extractor and
-rejects schema/version mismatches and nonpositive/nonfinite predictions rather
-than silently clipping them. The output contains only `file_id,prediction`.
+`prediction` is a single numeric cumulative-damage value. One row per file.
+
+Source: `Backend/01_Problem_Statement_3_Specifications.md` section 4.1.
+
+---
+
+## What you need to deliver
+
+Fill in the skeleton:
+
+```
+SHM/
+  core/data.py             column constants, read_raw(), check_schema()
+  core/features.py         feature extraction
+  core/model.py            load + predict
+  core/errors.py           already written -- ShmInputError / ShmModelError
+  training/train.py        fits, selects, writes ./model artifacts
+  training/evaluate.py     scores against the info kit fixed metric
+  prediction/predict.py    <- THE ONE FILE THE API CALLS
+```
+
+### The only signature that is not yours to choose
+
+```python
+# prediction/predict.py
+
+def predict_file(frame: pd.DataFrame, model, reference: dict | None = None) -> dict:
+    ...
+```
+
+Returning, for this subsystem:
+
+```python
+{"prediction": 0.0421, "interval": [0.031, 0.055], "warnings": []}
+```
+
+Three rules, all learned the hard way on Door:
+
+1. **Raise, never `sys.exit`.** Use `ShmInputError` / `ShmModelError` from
+   `core/errors.py`. `SystemExit` inherits from `BaseException`, so a caller
+   `except Exception` misses it and the whole server dies instead of showing
+   the message.
+2. **`ShmInputError` messages are shown to users verbatim.** Write them for a
+   non-technical reader. Multi-line is fine.
+3. **Return plain `int` / `float` / `str`.** `np.int64` is not a subclass of
+   `int`, and the API response validation rejects it.
+
+Keep `predict_file` deterministic. The API caches results by file hash and
+will not re-run your model on a file it has already seen.
+
+---
+
+## Wiring it into the API
+
+When `predict_file` works, it is a **two-file change** and you write no routes:
+
+1. Fill in `Backend/app/subsystems/shm/runner.py` -- copy
+   `Backend/app/subsystems/door/runner.py`, which is the worked reference.
+2. In `Backend/app/subsystems/registry.py`, replace
+
+   ```python
+   register(NotImplementedRunner("shm", "SHM"))
+   ```
+   with
+   ```python
+   register(ShmRunner())
+   ```
+
+Auth, the shared prediction cache, per-user history and error mapping all come
+for free. Confirm it worked:
+
+```bash
+curl.exe http://127.0.0.1:8000/api/health
+```
+
+Your subsystem should report `"available": true` with a real `model_version`.
+
+> **Import-name collision.** Door currently occupies the top-level module names
+> `core`, `training` and `prediction` via its `vendor_path.py` shim. The second
+> subsystem wired into the API **cannot** reuse those names. Give this
+> directory a package root, or rename its modules to `shm_core` /
+> `shm_prediction`, before you wire up. See `Backend/README.md`.
+
+---
+
