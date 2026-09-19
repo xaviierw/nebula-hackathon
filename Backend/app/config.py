@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     allowed_email_domains: str = ""
 
     # --- Limits ----------------------------------------------------------
-    max_upload_bytes: int = 26_214_400  # 25 MiB
+    max_upload_bytes: int = 104_857_600  # 100 MiB per file
 
     # --- Behaviour -------------------------------------------------------
     prediction_cache_enabled: bool = True

@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 from ..errors import NotFoundError
+from .acv.runner import AcvRunner
 from .base import SubsystemRunner
 from .door.runner import DoorRunner
 from .rail.runner import RailRunner
@@ -60,7 +61,6 @@ def load_all() -> None:
 #     register(AcvRunner())
 
 register(DoorRunner())
-register(NotImplementedRunner("acv", "ACV"))
+register(AcvRunner())
 register(RailRunner())
 register(ShmRunner())
-
