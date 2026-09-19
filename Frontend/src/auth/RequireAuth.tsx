@@ -8,6 +8,13 @@ import { useAuth } from './useAuth'
  * repeated on every protected page.
  */
 export function RequireAuth() {
-  const { isAuthed } = useAuth()
+  const { isAuthed, isLoading } = useAuth()
+  if (isLoading) {
+    return (
+      <div role="status" className="flex min-h-dvh items-center justify-center bg-slate-50 text-sm text-slate-600">
+        Checking your session…
+      </div>
+    )
+  }
   return isAuthed ? <Outlet /> : <Navigate to="/login" replace />
 }

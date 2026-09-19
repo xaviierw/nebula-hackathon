@@ -7,12 +7,15 @@ import { useAuth } from '../auth/useAuth'
  * outside it - a "Log Out" button before anyone has logged in makes no sense.
  */
 export function AppShell() {
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
   const navigate = useNavigate()
 
-  function handleLogout() {
-    logout()
-    navigate('/', { replace: true })
+  async function handleLogout() {
+    try {
+      await logout()
+    } finally {
+      navigate('/', { replace: true })
+    }
   }
 
   return (
@@ -26,13 +29,16 @@ export function AppShell() {
             Nebula
             <span className="ml-2 text-sm font-normal text-slate-500">Rail Diagnostics</span>
           </Link>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-          >
-            Log Out
-          </button>
+          <div className="flex items-center gap-3">
+            {user?.email && <span className="hidden text-sm text-slate-500 sm:inline">{user.email}</span>}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Log Out
+            </button>
+          </div>
         </div>
       </header>
 

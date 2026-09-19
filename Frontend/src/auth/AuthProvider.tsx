@@ -1,58 +1,102 @@
-import { useCallback, useMemo, useState } from 'react'
+import { FirebaseError } from 'firebase/app'
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'
+import type { User } from 'firebase/auth'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 
-import { AUTH_STORAGE_KEY, AuthContext } from './auth-context'
+import { apiFetch } from '../api/client'
+import {
+  firebaseAuth,
+  firebaseConfigurationError,
+  requireFirebaseAuth,
+} from '../firebase'
+import { AuthContext } from './auth-context'
 import type { AuthValue } from './auth-context'
 
-/**
- * Placeholder authentication.
- *
- * `login()` ignores whatever was typed and always succeeds - the scaffold is
- * meant to be walked through without credentials. What it does provide is the
- * seam: a single function body to replace when real auth arrives, and a guard
- * (RequireAuth) that already wraps the protected routes, so /home cannot be
- * reached just by typing the URL.
- *
- * sessionStorage access is wrapped because it throws in some privacy modes.
- */
-
-function readStoredAuth(): boolean {
-  try {
-    return sessionStorage.getItem(AUTH_STORAGE_KEY) === 'true'
-  } catch {
-    return false
-  }
-}
-
-function writeStoredAuth(isAuthed: boolean): void {
-  try {
-    if (isAuthed) {
-      sessionStorage.setItem(AUTH_STORAGE_KEY, 'true')
-    } else {
-      sessionStorage.removeItem(AUTH_STORAGE_KEY)
-    }
-  } catch {
-    // Non-fatal: auth then simply does not survive a refresh.
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthed, setIsAuthed] = useState(readStoredAuth)
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(firebaseAuth !== null)
+  const loginInProgress = useRef(false)
 
-  const login = useCallback(() => {
-    writeStoredAuth(true)
-    setIsAuthed(true)
+  useEffect(() => {
+    if (firebaseAuth === null) return
+    return onAuthStateChanged(firebaseAuth, (nextUser) => {
+      // signInWithEmailAndPassword updates Firebase state before the backend
+      // has accepted /auth/session. Let login() finish that handshake first,
+      // otherwise the route guard can briefly admit a rejected account.
+      if (loginInProgress.current) return
+      setUser(nextUser)
+      setIsLoading(false)
+    })
   }, [])
 
-  const logout = useCallback(() => {
-    writeStoredAuth(false)
-    setIsAuthed(false)
+  const login = useCallback(async (email: string, password: string) => {
+    const auth = requireFirebaseAuth()
+    loginInProgress.current = true
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email, password)
+      const response = await apiFetch('/auth/session', { method: 'POST' })
+      if (!response.ok) {
+        const message = await problemMessage(response, 'The backend could not start your session.')
+        throw new Error(message)
+      }
+      setUser(credential.user)
+    } catch (error) {
+      if (auth.currentUser) await signOut(auth).catch(() => undefined)
+      setUser(null)
+      if (error instanceof FirebaseError) throw new Error(firebaseMessage(error))
+      throw error
+    } finally {
+      loginInProgress.current = false
+    }
   }, [])
 
-  const value = useMemo<AuthValue>(
-    () => ({ isAuthed, login, logout }),
-    [isAuthed, login, logout],
-  )
+  const logout = useCallback(async () => {
+    const auth = requireFirebaseAuth()
+    await signOut(auth)
+    setUser(null)
+  }, [])
+
+  const value = useMemo<AuthValue>(() => ({
+    isAuthed: user !== null,
+    isLoading,
+    user,
+    configurationError: firebaseConfigurationError,
+    login,
+    logout,
+  }), [isLoading, login, logout, user])
 
   return <AuthContext value={value}>{children}</AuthContext>
+}
+
+async function problemMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const body: unknown = await response.json()
+    if (body !== null && typeof body === 'object' && 'message' in body) {
+      const message = (body as { message?: unknown }).message
+      if (typeof message === 'string') return message
+    }
+  } catch {
+    // A proxy may return HTML; keep the stable fallback.
+  }
+  return fallback
+}
+
+function firebaseMessage(error: FirebaseError): string {
+  switch (error.code) {
+    case 'auth/invalid-credential':
+    case 'auth/invalid-email':
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+      return 'The email or password is incorrect.'
+    case 'auth/user-disabled':
+      return 'This account has been disabled. Contact your administrator.'
+    case 'auth/too-many-requests':
+      return 'Too many unsuccessful attempts. Wait a moment and try again.'
+    case 'auth/network-request-failed':
+      return 'Could not reach Firebase Authentication. Check your connection and try again.'
+    default:
+      return 'Sign-in failed. Please try again.'
+  }
 }

@@ -1,13 +1,5 @@
-# SHM subsystem dependencies.
-#
-# Split deliberately: the API installs only the INFERENCE tier (see
-# Backend/requirements.txt). Training dependencies must never become an API
-# dependency.
-
-# --- INFERENCE (always required) ---
-pandas>=2.2
-numpy>=2.2
-
-# --- TRAINING (only needed to refit the model) ---
-# scikit-learn>=1.5
-# joblib>=1.4
+-r requirements-inference.txt
+# Offline training and validation only
+scikit-learn==1.6.1
+pytest==8.3.5
+httpx==0.28.1  # Shared API tests; install Backend/requirements.txt as well.

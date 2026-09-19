@@ -3,8 +3,8 @@
 FastAPI service behind the React frontend. One API, four condition-monitoring
 subsystems, Firebase Auth for sign-in and Firestore for history.
 
-**Status:** scaffold complete and verified. Door is wired end to end. ACV, Rail
-Corrugation and SHM are skeletons returning HTTP 501 until someone builds them.
+**Status:** scaffold complete. Door and Rail Corrugation are wired into the
+shared API. ACV and SHM remain skeletons returning HTTP 501.
 
 ---
 
@@ -76,8 +76,8 @@ interchangeable — a single generic response model does not fit all four.
 |---|---|---|---|---|
 | **Door** ✅ | `door` | Temporal segment detection | `start_time,end_time,prediction` — **no `file_id`**, one row per segment | `stream` |
 | **ACV** ⬜ | `acv` | Fault localisation / ranking | `file_id,ranked_cars` — **no `prediction` column**, car ids `\|`-separated | `per-file` |
-| **Rail Corrugation** ⬜ | `rail-corrugation` | 3-class classification | `file_id,prediction` ∈ `Normal`/`Side I`/`Side II` | `per-file` |
-| **SHM** ⬜ | `shm` | Regression | `file_id,prediction` — numeric | `per-file` |
+| **Rail Corrugation** ✅ | `rail-corrugation` | 3-class classification | `file_id,prediction` ∈ `Normal`/`Side I`/`Side II` | `per-file` |
+| **SHM** ✅ | `shm` | Regression | `file_id,prediction` — numeric | `per-file` |
 
 Source: `01_Problem_Statement_3_Specifications.md` §4.1.
 
@@ -89,15 +89,22 @@ submission CSV needs many files in one pass.
 Ids match `SubsystemId` in `Frontend/src/subsystems.ts` exactly, hyphen and all.
 They are the URL slug on both sides.
 
-### ⚠️ Three subsystems are blocked on data
+### ⚠️ Two subsystems are blocked on data
 
 `02_Datasets/` and `03_References/` contain **only `Door/`**. There are no
-datasets and no info kits for ACV, Rail Corrugation or SHM in this repo.
+datasets and no info kits for ACV or SHM in this repo. Rail's fitted inference
+bundle and analysis notebook are committed under `Rail_Corrugation/`; its large
+source recordings remain intentionally ignored.
 
 The problem statement calls each info kit *"the authoritative problem
 definition"* and says to read it before starting. Whoever owns each subsystem
-needs that material before any feature work. The skeletons are buildable
+needs that material before any feature work. Their skeletons are buildable
 regardless — structure, CLI, error types and the API seam do not depend on data.
+### Dataset availability for SHM
+SHM's optional local data lives in。
+`SHM/dataset_shm/SHM`, with saved validation outputs in `SHM/outputs/grouped`.
+Its deployed `SHM/artifacts/model.json` is tracked and needs no training data
+at runtime.
 
 ---
 
@@ -108,7 +115,9 @@ Full brief in each directory's own README:
 [`Rail_Corrugation/README.md`](Rail_Corrugation/README.md) ·
 [`SHM/README.md`](SHM/README.md)
 
-Every subsystem has the same layout, the one Door proved out:
+Door and the unfinished subsystem scaffolds use this layout. SHM keeps its
+existing offline training modules at its package root and uses `artifacts/`
+and `outputs/`; see [its final layout](SHM/README.md#shared-inference-package).
 
 ```
 <Subsystem>/
@@ -170,7 +179,7 @@ Auth, caching, history and error mapping come for free. Confirm with
 > occupies the top-level module names `core`, `training` and `prediction` via
 > its `vendor_path.py` shim. The next subsystem to be wired in **cannot** reuse
 > those names — give it a package root, or rename to `acv_core` /
-> `acv_prediction`. Only Door is wired today, so this has not bitten yet.
+> `acv_prediction`. SHM uses qualified `SHM.*` imports and coexists with Door.
 
 ---
 
@@ -351,6 +360,10 @@ rules — not from hiding it.
 Use `.env.local` specifically: the root `.gitignore` covers
 `Frontend/.env*.local`.
 
+Copy `Frontend/.env.example` to `Frontend/.env.local` and fill the public values.
+The frontend now implements Firebase Email/Password sign-in, session restoration,
+shared `/auth/session` verification, and one token-refresh retry on 401.
+
 ### Firebase setup, one-time
 
 1. Create a project, skip Analytics.
@@ -374,6 +387,7 @@ Use `.env.local` specifically: the root `.gitignore` covers
 |---|---|
 | Firebase credentials missing or bad | **Crash.** Every route needs auth; a server that cannot verify tokens is not partially useful |
 | Firestore unreachable | Not probed at startup; per-request 503 |
+| `SHM/artifacts/model.json` missing/incompatible | **Degrade.** Only SHM returns 503; reason appears in `/api/health` |
 | `door_model.json` missing | **Degrade.** Door → 503 with an actionable message; auth, history and the other subsystems still work |
 | `door_reference.json` missing | Degrade silently, log once. `warnings` is `[]` — known and correct |
 | `core` resolves outside `Backend/Door` | **Crash.** A wrong import would produce confidently wrong predictions |
@@ -451,20 +465,14 @@ curl.exe -H "Authorization: Bearer $T" http://127.0.0.1:8000/api/users/me/runs
 
 ## Connecting the frontend
 
-The frontend still serves a fixture. Four changes, in order:
+Firebase authentication is connected in the frontend: email/password login,
+session restoration, bearer tokens and one forced-refresh retry on `401`.
+Configure the four `VITE_FIREBASE_*` values in `Frontend/.env.local` using
+`Frontend/.env.example`.
 
-1. `cd Frontend && npm i firebase`; add `.env.local`; create `src/firebase.ts`.
-2. Rewrite `src/auth/AuthProvider.tsx` onto `onAuthStateChanged`, **adding a
-   third loading state**. `RequireAuth.tsx` redirects whenever `isAuthed` is
-   false, but `onAuthStateChanged` resolves asynchronously — without a loading
-   state, every hard refresh bounces the user to `/login`. `AuthValue` needs
-   `isAuthed: boolean | null`, and `login` must become
-   `(email, password) => Promise<void>`.
-3. `src/api/client.ts:16` — attach the bearer token at the existing TODO; on a
-   401, retry once with `getIdToken(true)`.
-4. `src/features/door/runPrediction.ts` — paste the implementation already
-   written in its own docstring at lines 25–37, and set
-   `IS_PLACEHOLDER_DATA = false`.
+Door still serves its fixture. To connect it, update
+`src/features/door/runPrediction.ts` using the implementation in its docstring
+and set `IS_PLACEHOLDER_DATA = false`.
 
 The results table, summary and CSV download should be identical to the
 fixture-driven version but with real numbers, and the demo banner disappears.
@@ -512,10 +520,29 @@ preserving every error type and message verbatim.
 larger uploads to `%TEMP%` — which would break the "bytes never touch disk"
 guarantee. `Test.csv` is 401 KB, so this would not have shown up in testing.
 
-**The API tier never imports `training/`.** scikit-learn's binaries are blocked
-by Windows Smart App Control on this machine, so training runs under WSL.
-Door's inference path is deliberately sklearn-free, which is what lets the API
-run natively.
+**The API tier never imports `training/`.** Door inference is sklearn-free.
+Rail inference loads its committed Extra Trees bundle and therefore pins the
+exact NumPy, pandas, SciPy, scikit-learn and joblib versions recorded by that
+bundle in `Backend/requirements.txt`. The other subsystems must either produce
+artifacts compatible with this shared inference environment or use a
+version-neutral format; one Python process cannot safely load incompatible
+scikit-learn pickle versions.
+
+**Rail is a real package.** `Rail_Corrugation.predictor` avoids colliding with
+Door's top-level `core`, `training` and `prediction` imports. Its API adapter is
+bytes-in and uses no temporary upload files.
 
 **Routers are generated from the registry**, not hand-written per subsystem.
 That is what makes adding a model a one-line change.
+
+## SHM response and cache
+
+`POST /api/shm/predict` returns prediction, observations, weighted_cycle_count,
+model_id (artifact SHA256), model_version (pipeline revision + hash), null
+interval, and structured warnings. It never returns a request filename in the
+content-cached payload. The frontend associates its selected filename locally;
+batch responses and request history retain the current upload's filename.
+Sequential single uploads are supported; `/predict-batch` is optional.
+SHM uses rainflow 3.2.0 and SciPy logsumexp, with no scikit-learn inference import.
+Shared runner InputError/ModelError exceptions are translated to 400/503 before
+leaving the router, so both single and batch responses have actionable messages.

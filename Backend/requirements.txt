@@ -19,9 +19,17 @@ pydantic-settings>=2.8
 # it, and a second constraint only creates resolution conflicts.
 firebase-admin>=7.0
 
-# --- Inference tier (mirrors the INFERENCE block of Door/requirements.txt)
-pandas>=2.2
-numpy>=2.2
+# --- Inference tier ------------------------------------------------------
+# Rail's committed Extra Trees bundle validates these exact versions at
+# startup. Door remains sklearn-free, so these pins do not alter its model.
+numpy==2.3.3
+pandas==2.3.3
+scipy==1.16.2
+scikit-learn==1.7.2
+joblib==1.5.3
+
+# --- Inference tier (also supplies Door's pandas/numpy requirements) -------
+-r SHM/requirements-inference.txt
 
 # scikit-learn is deliberately absent. Training runs under WSL; the prediction
 # path this API calls is sklearn-free by design -- see Backend/Door/core/classifier.py.
