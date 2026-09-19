@@ -1,69 +1,102 @@
+import { FirebaseError } from 'firebase/app'
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'
+import type { User } from 'firebase/auth'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'
 
 import { apiFetch } from '../api/client'
+import {
+  firebaseAuth,
+  firebaseConfigurationError,
+  requireFirebaseAuth,
+} from '../firebase'
 import { AuthContext } from './auth-context'
 import type { AuthValue } from './auth-context'
-import { authConfigurationError, firebaseAuth } from './firebase'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthed, setIsAuthed] = useState(false)
-  const [loading, setLoading] = useState(Boolean(firebaseAuth))
-  const [error, setError] = useState(authConfigurationError)
-  const retrySession = useRef<(() => Promise<void>) | null>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(firebaseAuth !== null)
+  const loginInProgress = useRef(false)
 
   useEffect(() => {
-    const auth = firebaseAuth
-    if (!auth) return
-    let generation = 0
-    const restoreSession = async (user: typeof auth.currentUser) => {
-      const current = ++generation
-      setLoading(true)
-      setIsAuthed(false)
-      setError('')
-      try {
-        if (user) {
-          const response = await apiFetch('/auth/session', { method: 'POST' })
-          if (!response.ok) {
-            const problem = await response.json().catch(() => null)
-            throw new Error(problem?.message ?? 'Sign-in could not be verified. Please retry.')
-          }
-          if (current === generation) setIsAuthed(true)
-        }
-      } catch (caught) {
-        if (current === generation) setError(caught instanceof Error ? caught.message : 'Cannot reach the sign-in service.')
-      } finally {
-        if (current === generation) setLoading(false)
-      }
-    }
-    retrySession.current = () => restoreSession(auth.currentUser)
-    const unsubscribe = onAuthStateChanged(auth, restoreSession, () => {
-      setError('Your session could not be restored. Please sign in again.')
-      setLoading(false)
+    if (firebaseAuth === null) return
+    return onAuthStateChanged(firebaseAuth, (nextUser) => {
+      // signInWithEmailAndPassword updates Firebase state before the backend
+      // has accepted /auth/session. Let login() finish that handshake first,
+      // otherwise the route guard can briefly admit a rejected account.
+      if (loginInProgress.current) return
+      setUser(nextUser)
+      setIsLoading(false)
     })
-    return () => { generation++; retrySession.current = null; unsubscribe() }
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
-    if (!firebaseAuth) throw new Error(authConfigurationError)
-    setError('')
-    const previousUser = firebaseAuth.currentUser
+    const auth = requireFirebaseAuth()
+    loginInProgress.current = true
     try {
-      const credential = await signInWithEmailAndPassword(firebaseAuth, email, password)
-      // Firebase need not emit a state change when the same user retries after
-      // an unavailable backend. Recheck the shared session explicitly then.
-      if (previousUser?.uid === credential.user.uid) await retrySession.current?.()
+      const credential = await signInWithEmailAndPassword(auth, email, password)
+      const response = await apiFetch('/auth/session', { method: 'POST' })
+      if (!response.ok) {
+        const message = await problemMessage(response, 'The backend could not start your session.')
+        throw new Error(message)
+      }
+      setUser(credential.user)
+    } catch (error) {
+      if (auth.currentUser) await signOut(auth).catch(() => undefined)
+      setUser(null)
+      if (error instanceof FirebaseError) throw new Error(firebaseMessage(error))
+      throw error
+    } finally {
+      loginInProgress.current = false
     }
-    catch { throw new Error('Could not sign in. Check your email and password, then retry.') }
-  }, [])
-  const logout = useCallback(async () => {
-    if (firebaseAuth) await signOut(firebaseAuth)
   }, [])
 
-  const value = useMemo<AuthValue>(
-    () => ({ isAuthed, loading, error, login, logout }),
-    [isAuthed, loading, error, login, logout],
-  )
+  const logout = useCallback(async () => {
+    const auth = requireFirebaseAuth()
+    await signOut(auth)
+    setUser(null)
+  }, [])
+
+  const value = useMemo<AuthValue>(() => ({
+    isAuthed: user !== null,
+    isLoading,
+    user,
+    configurationError: firebaseConfigurationError,
+    login,
+    logout,
+  }), [isLoading, login, logout, user])
+
   return <AuthContext value={value}>{children}</AuthContext>
+}
+
+async function problemMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const body: unknown = await response.json()
+    if (body !== null && typeof body === 'object' && 'message' in body) {
+      const message = (body as { message?: unknown }).message
+      if (typeof message === 'string') return message
+    }
+  } catch {
+    // A proxy may return HTML; keep the stable fallback.
+  }
+  return fallback
+}
+
+function firebaseMessage(error: FirebaseError): string {
+  switch (error.code) {
+    case 'auth/invalid-credential':
+    case 'auth/invalid-email':
+    case 'auth/user-not-found':
+    case 'auth/wrong-password':
+      return 'The email or password is incorrect.'
+    case 'auth/user-disabled':
+      return 'This account has been disabled. Contact your administrator.'
+    case 'auth/too-many-requests':
+      return 'Too many unsuccessful attempts. Wait a moment and try again.'
+    case 'auth/network-request-failed':
+      return 'Could not reach Firebase Authentication. Check your connection and try again.'
+    default:
+      return 'Sign-in failed. Please try again.'
+  }
 }

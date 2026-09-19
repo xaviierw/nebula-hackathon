@@ -1,9 +1,11 @@
 import { createContext } from 'react'
+import type { User } from 'firebase/auth'
 
 export interface AuthValue {
   isAuthed: boolean
-  loading: boolean
-  error: string
+  isLoading: boolean
+  user: User | null
+  configurationError: string | null
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }

@@ -1,0 +1,60 @@
+{
+  "selected": "threshold_mad",
+  "cv_results": {
+    "threshold_mad": {
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "abnormal_f1": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "blocked_macro_f1": 1.0,
+      "blocked_abnormal_recall": 1.0
+    },
+    "threshold_midpoint": {
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "abnormal_f1": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "blocked_macro_f1": 0.9822129822129823,
+      "blocked_abnormal_recall": 0.9473684210526315
+    },
+    "logistic_regression": {
+      "accuracy": 0.974025974025974,
+      "macro_f1": 0.9637476459510358,
+      "abnormal_f1": 0.9444444444444444,
+      "false_negative": 2,
+      "false_positive": 0,
+      "blocked_macro_f1": 0.9637476459510358,
+      "blocked_abnormal_recall": 0.8947368421052632
+    },
+    "gradient_boosting": {
+      "accuracy": 0.987012987012987,
+      "macro_f1": 0.9822129822129823,
+      "abnormal_f1": 0.972972972972973,
+      "false_negative": 1,
+      "false_positive": 0,
+      "blocked_macro_f1": 0.9822129822129823,
+      "blocked_abnormal_recall": 0.9473684210526315
+    },
+    "random_forest": {
+      "accuracy": 0.987012987012987,
+      "macro_f1": 0.9822129822129823,
+      "abnormal_f1": 0.972972972972973,
+      "false_negative": 1,
+      "false_positive": 0,
+      "blocked_macro_f1": 0.9822129822129823,
+      "blocked_abnormal_recall": 0.9473684210526315
+    }
+  },
+  "fit_cycles": 77,
+  "fit_abnormal": 19,
+  "thresholds": {
+    "close": 251.2795880149801,
+    "open": 304.1618367346938
+  },
+  "separation_margins": {
+    "close": 58.07269146325598,
+    "open": 31.651632653061142
+  }
+}

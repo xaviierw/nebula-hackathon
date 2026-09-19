@@ -1,0 +1,7 @@
+/Dataset/
+/.archive/
+/.cache/
+/.ipynb_checkpoints/
+__pycache__/
+/.venv/
+/models/*.pending.joblib

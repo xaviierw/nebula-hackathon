@@ -12,6 +12,8 @@ import logging
 from ..errors import NotFoundError
 from .base import SubsystemRunner
 from .door.runner import DoorRunner
+from .rail.runner import RailRunner
+
 from .shm.runner import ShmRunner
 from .stubs import NotImplementedRunner
 
@@ -59,5 +61,6 @@ def load_all() -> None:
 
 register(DoorRunner())
 register(NotImplementedRunner("acv", "ACV"))
-register(NotImplementedRunner("rail-corrugation", "Rail Corrugation"))
+register(RailRunner())
 register(ShmRunner())
+

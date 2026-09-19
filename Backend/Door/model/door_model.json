@@ -1,15 +1,19 @@
 {
   "model_type": "operation_threshold",
+  "estimator": "threshold_mad",
   "feature": "current_mid_mean",
-  "threshold_open": 304.6301020408163,
-  "threshold_close": 251.507703595011,
-  "margin_open": 64.23979591836735,
-  "margin_close": 116.60161408657376,
+  "threshold_open": 304.1618367346938,
+  "threshold_close": 251.2795880149801,
+  "margin_open": 31.651632653061142,
+  "margin_close": 58.07269146325598,
   "labels": {
     "above": "Abnormal resistance",
     "below": "Normal"
   },
   "fitted_on": "Train.csv chronological fit split (first 70% of cycles)",
   "fit_cycles": 77,
+  "cv_macro_f1_stratified": 1.0,
+  "cv_macro_f1_blocked": 1.0,
+  "cv_abnormal_recall_blocked": 1.0,
   "cv_macro_f1": 1.0
 }
