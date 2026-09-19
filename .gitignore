@@ -3,17 +3,12 @@ Backend/02_Datasets/
 Backend/03_References/
 Backend/04_Example_Submission/
 
-# Virtual environments
+# Virtual environment
 .venv/
-venv/
-env/
 
 # Python artifacts
 __pycache__/
 *.pyc
-*.pyo
-.pytest_cache/
-.ipynb_checkpoints/
 
 # Editor and OS junk - contributors are on different machines
 .vscode/
